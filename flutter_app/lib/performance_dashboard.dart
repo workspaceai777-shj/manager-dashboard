@@ -11,14 +11,17 @@ class PerformanceDashboard extends StatefulWidget {
 class _PerformanceDashboardState extends State<PerformanceDashboard> {
   String branch='ALL',category='ALL',employee='ALL';
   DateTimeRange? period;
+  bool todayOnly = true;
+  String dateLabel(DateTime d) => [d.day.toString().padLeft(2,'0'),d.month.toString().padLeft(2,'0'),d.year.toString()].join('/');
   double num(dynamic x)=>double.tryParse(x.toString())??0;
   List<String> options(String key)=>['ALL',...widget.records.map((e)=>e[key].toString())].toSet().toList();
   List<dynamic> get rows=>widget.records.where((e){
     if(branch!='ALL'&&e['branch']!=branch)return false;
     if(category!='ALL'&&e['category']!=category)return false;
     if(employee!='ALL'&&e['employeeName']!=employee)return false;
-    if(period!=null){
+    if(todayOnly || period!=null){
       final d=DateTime.tryParse(e['date'].toString());
+      if(todayOnly){final today=DateTime.now();return d!=null && d.year==today.year && d.month==today.month && d.day==today.day;}
       if(d==null||d.isBefore(period!.start)||d.isAfter(period!.end))return false;
     }
     return true;
@@ -131,12 +134,15 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
         picker('Branch',branch,options('branch'),(v)=>setState(()=>branch=v??'ALL')),
         picker('Category',category,options('category'),(v)=>setState(()=>category=v??'ALL')),
         picker('Employee',employee,options('employeeName'),(v)=>setState(()=>employee=v??'ALL')),
+        FilledButton.tonalIcon(icon:const Icon(Icons.today),
+          onPressed:()=>setState((){todayOnly=true;period=null;}),
+          label:Text('Today — '+dateLabel(DateTime.now()))),
         OutlinedButton.icon(icon:const Icon(Icons.date_range),
           onPressed:() async {final v=await showDateRangePicker(context:context,
-            firstDate:DateTime(2024),lastDate:DateTime(2036));
-            if(v!=null)setState(()=>period=v);},
-          label:Text(period==null?'All dates':'Filtered dates')),
-        if(period!=null)TextButton(onPressed:()=>setState(()=>period=null),child:const Text('Clear')),
+            firstDate:DateTime(2024),lastDate:DateTime(2036),initialDateRange:period);
+            if(v!=null)setState((){todayOnly=false;period=v;});},
+          label:Text(period==null?'Choose date range':dateLabel(period!.start)+' – '+dateLabel(period!.end))),
+        TextButton(onPressed:()=>setState((){todayOnly=false;period=null;}),child:const Text('All loaded dates')),
       ]),
       const SizedBox(height:24),
       Wrap(spacing:14,runSpacing:14,children:[
