@@ -184,7 +184,7 @@ class _PortalState extends State<Portal> {
     refresh: () async {setState(()=>loading=true);await load();},
   );
 
-  Widget branchSelector() => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('Select your working branch'), ...assignments.map((a) => TextButton(onPressed: () => setState(() { branch = a['branch']; category = a['category']; branchSelected = true; }), child: Text(a['branch'] + ' — ' + a['category'])))]));
+  Widget branchSelector() => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('Select your working branch'), ...assignments.map((a) => TextButton(onPressed: () => setState(() { branch = a['branch']; category = a['category']; branchSelected = true; }), child: Text("${a['branch']} — ${a['category']}")))]));
 
   Widget settings() {
     return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
