@@ -25,7 +25,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
   }).toList();
   Widget picker(String name,String selected,List<String> opts,ValueChanged<String?> change)=>
     SizedBox(width:180,child:DropdownButtonFormField<String>(key:ValueKey(name+selected),
-      initialValue:opts.contains(selected)?selected:'ALL',
+      value:opts.contains(selected)?selected:'ALL',
       decoration:InputDecoration(labelText:name,isDense:true),
       items:opts.map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),
       onChanged:change));
@@ -87,11 +87,11 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
               radius:44,showTitle:false)).toList()))),
         SizedBox(width:160,child:Column(mainAxisAlignment:MainAxisAlignment.center,
           crossAxisAlignment:CrossAxisAlignment.start,children:[
-          Text(totalHours.toStringAsFixed(2)+' hours',
+          Text('${totalHours.toStringAsFixed(2)} hours',
             style:const TextStyle(fontWeight:FontWeight.w700,fontSize:18)),
           const SizedBox(height:8),
           ...hourTasks.take(5).map((e)=>Padding(padding:const EdgeInsets.only(bottom:5),
-            child:Text(e.key.replaceAll('_',' ')+' — '+e.value.toStringAsFixed(1)+'h',
+            child:Text("${e.key.replaceAll('_', ' ')} — ${e.value.toStringAsFixed(1)}h",
               maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11)))),
         ])),
       ])));
