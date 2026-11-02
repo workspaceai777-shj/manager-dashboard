@@ -92,7 +92,7 @@ class _PortalState extends State<Portal> {
         tasks = List.from((await api.request('tasks', body: {'branch': branch, 'category': category}))['tasks'] ?? []);
       }
       if (profile['role'] == 'ADMIN' || profile['role'] == 'MANAGER') {
-        entries = List.from((await api.request('dashboard', body: {'from': _date(DateTime(reportDate.year,reportDate.month,1)), 'to': _date(reportDate)}))['entries'] ?? []);
+        entries = List.from((await api.request('dashboard', body: {'from': _date(DateTime.now().subtract(const Duration(days:365))), 'to': _date(DateTime.now())}))['entries'] ?? []);
       }
       if (profile['role'] == 'ADMIN') users = List.from((await api.request('users'))['users'] ?? []);
       error = '';
