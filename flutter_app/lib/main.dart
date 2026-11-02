@@ -211,7 +211,7 @@ class _PortalState extends State<Portal> {
       TextField(controller:newUserName,decoration:const InputDecoration(labelText:'Staff name')),
       TextField(controller:newUserEmail,decoration:const InputDecoration(labelText:'Email')),
       DropdownButton<String>(value:newUserBranch,items:['ONT-BB','ONT-BR1'].map((e)=>DropdownMenuItem(value:e,child:Text(e))).toList(),onChanged:(v)=>setState(()=>newUserBranch=v!)),
-      DropdownButton<String>(value:newUserCategory,items:['FRONT DESK','INSURANCE USER'].map((e)=>DropdownMenuItem(value:e,child:Text(e))).toList(),onChanged:(v)=>setState(()=>newUserCategory=v!)),
+      DropdownButton<String>(value:newUserCategory,items:['FRONT DESK','INSURANCE USER','ACCOUNTS'].map((e)=>DropdownMenuItem(value:e,child:Text(e))).toList(),onChanged:(v)=>setState(()=>newUserCategory=v!)),
       FilledButton(onPressed:() async {try{
         await api.request('upsertUser',body:{'uid':newUserUid.text,'name':newUserName.text,'email':newUserEmail.text,'role':'STAFF','branch':newUserBranch,'category':newUserCategory});
         message('Assignment saved'); await load();
