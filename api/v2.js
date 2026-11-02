@@ -62,8 +62,17 @@ const bbTasks=[
 ];
 const insurance=[['insurance_invoices','Insurance Invoices Prepared'],['insurance_documents','Insurance Documents Sent'],
 ['insurance_datewise','Insurance Datewise Updated'],['insurance_emrwise','Insurance EMRwise Updated']];
+const accounts=[
+  ['accounts_r4_ledgers','R4 Individual Ledgers Created'],
+  ['accounts_collection_check','Daily Collections Checked — White Fox and Ontario'],
+  ['accounts_dha_attendance','DHA Attendance Records Updated'],
+  ['accounts_insurance_ledgers','Individual Insurance Ledgers Updated'],
+  ['accounts_petty_cash','Petty Cash Filing Completed'],
+  ['accounts_month_end','Month-End Collection Closing and Bank Deposit Handover'],
+  ['accounts_reception','Reception Duties and Reporting Vouchers']
+];
 const activities=(branch,cat)=>{
-  const x=cat==='ACCOUNTS'?[]:cat==='INSURANCE USER'?insurance:branch==='ONT-BB'?bbTasks:[...baseReception,...brLedger,['collection','Daily Collection (AED)']];
+  const x=cat==='ACCOUNTS'?accounts:cat==='INSURANCE USER'?insurance:branch==='ONT-BB'?bbTasks:[...baseReception,...brLedger,['collection','Daily Collection (AED)']];
   return x.map(([id,name])=>({id,name}));
 };
 function validDate(v) {return /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));}
