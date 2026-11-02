@@ -144,7 +144,9 @@ class _PortalState extends State<Portal> {
         }),
         OutlinedButton.icon(onPressed:() async {final x=await showDatePicker(context:context,initialDate:reportDate,firstDate:DateTime(2024),lastDate:DateTime(2035));if(x!=null)setState(()=>reportDate=x);}, icon:const Icon(Icons.calendar_month),label:Text(_date(reportDate))),
       ]),
-      const SizedBox(height:18), const Text('Daily activities — quantity and hours',style:TextStyle(fontWeight:FontWeight.bold,fontSize:18)),
+      const SizedBox(height:24), const Text('Daily task report',style:TextStyle(fontWeight:FontWeight.w800,fontSize:27,color:TaskLogStyle.ink)),
+      const SizedBox(height:5),const Text('Record quantities and actual time spent on each activity',style:TextStyle(color:TaskLogStyle.muted)),
+      const SizedBox(height:20), const Text('Activities',style:TextStyle(fontWeight:FontWeight.w700,fontSize:18)),
       const SizedBox(height:8),
       ...tasks.where((t)=>t['id']!='ledger_prepared').map((t){
         final id=t['id'].toString();
