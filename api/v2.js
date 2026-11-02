@@ -4,7 +4,7 @@ import { google } from 'googleapis';
 const SHEET_ID = process.env.GOOGLE_SHEET_ID || '1Zr7W7P7JUTUR43nDmR1YWmvqYsdctdzmMfM7Px-q7lo';
 const TAB_USERS = 'App_Users', TAB_ASSIGN = 'App_Assignments', TAB_ENTRIES = 'App_Entries';
 const allowedBranches = ['ONT-BB','ONT-BR1'];
-const allowedCategories = ['FRONT DESK','INSURANCE USER'];
+const allowedCategories = ['FRONT DESK','INSURANCE USER','ACCOUNTS'];
 
 if (!admin.apps.length && process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
   admin.initializeApp({ credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)) });
@@ -63,7 +63,7 @@ const bbTasks=[
 const insurance=[['insurance_invoices','Insurance Invoices Prepared'],['insurance_documents','Insurance Documents Sent'],
 ['insurance_datewise','Insurance Datewise Updated'],['insurance_emrwise','Insurance EMRwise Updated']];
 const activities=(branch,cat)=>{
-  const x=cat==='INSURANCE USER'?insurance:branch==='ONT-BB'?bbTasks:[...baseReception,...brLedger,['collection','Daily Collection (AED)']];
+  const x=cat==='ACCOUNTS'?[]:cat==='INSURANCE USER'?insurance:branch==='ONT-BB'?bbTasks:[...baseReception,...brLedger,['collection','Daily Collection (AED)']];
   return x.map(([id,name])=>({id,name}));
 };
 function validDate(v) {return /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));}
