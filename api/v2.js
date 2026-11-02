@@ -129,6 +129,49 @@ export default async function handler(req,res){
       const allAssign=await readTab(sheets,TAB_ASSIGN);
       return result(res,200,{users:users.flatMap(u=>allAssign.filter(a=>a.uid===u.uid).map(a=>({...u,branch:a.branch,category:a.category})))});
     }
+
+    if(body.action==='createStaff'){
+      if(me.role!=='ADMIN')return result(res,403,{error:'Admin access required'});
+      const email=String(body.email||'').trim().toLowerCase();
+      const name=String(body.name||'').trim();
+      const password=String(body.password||'');
+      const role=String(body.role||'STAFF');
+      const selected=Array.isArray(body.assignments)?body.assignments:[];
+      if(!email.includes('@')||name.length<2||name.length>120||password.length<12||
+        !['STAFF','MANAGER','ADMIN'].includes(role)||selected.length<1||selected.length>4||
+        selected.some(a=>!allowedBranches.includes(a.branch)||!allowedCategories.includes(a.category))||
+        new Set(selected.map(a=>a.branch+'|'+a.category)).size!==selected.length)
+        return result(res,400,{error:'Invalid user details, password, or assignments'});
+      const created=await admin.auth().createUser({email,password,displayName:name,emailVerified:false,disabled:false});
+      try{
+        await append(sheets,TAB_USERS,[[created.uid,email,name,role,true]]);
+        await append(sheets,TAB_ASSIGN,selected.map(a=>[created.uid,a.branch,a.category,true]));
+      }catch(e){
+        // Avoid leaving a valid sign-in account without a matching staff role.
+        await admin.auth().updateUser(created.uid,{disabled:true}).catch(()=>{});
+        throw e;
+      }
+      return result(res,200,{ok:true,uid:created.uid});
+    }
+    if(body.action==='replaceAssignments'){
+      if(me.role!=='ADMIN')return result(res,403,{error:'Admin access required'});
+      const target=String(body.uid||'');
+      const selected=Array.isArray(body.assignments)?body.assignments:[];
+      if(!target||selected.length>4||selected.some(a=>!allowedBranches.includes(a.branch)||
+        !allowedCategories.includes(a.category))||
+        new Set(selected.map(a=>a.branch+'|'+a.category)).size!==selected.length)
+        return result(res,400,{error:'Invalid assignments'});
+      if(!users.some(u=>u.uid===target))return result(res,404,{error:'Unknown user'});
+      if(target===uid && selected.length===0)return result(res,400,{error:'Cannot revoke your own last assignment'});
+      const existing=await readTab(sheets,TAB_ASSIGN);
+      const next=existing.filter(a=>a.uid!==target).map(a=>[a.uid,a.branch,a.category,a.active]);
+      next.push(...selected.map(a=>[target,a.branch,a.category,true]));
+      // Overwrite entire small assignment table in one operation; preserves the header.
+      await sheets.spreadsheets.values.clear({spreadsheetId:SHEET_ID,range:"'App_Assignments'!A2:D20000"});
+      if(next.length)await sheets.spreadsheets.values.update({spreadsheetId:SHEET_ID,
+        range:"'App_Assignments'!A2",valueInputOption:'RAW',requestBody:{values:next}});
+      return result(res,200,{ok:true});
+    }
     if(body.action==='upsertUser'){
       if(me.role!=='ADMIN')return result(res,403,{error:'Admin access required'});
       const {uid:target,name,email,role,branch,category}=body;
