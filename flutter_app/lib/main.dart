@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'api.dart';
 import 'config.dart';
 import 'tasklog_style.dart';
+import 'performance_dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -178,33 +179,10 @@ class _PortalState extends State<Portal> {
     ]);
   }
 
-  Widget dashboard() {
-    final filtered = entries.where((e)=>e['branch']==branch || branch.isEmpty).toList();
-    double sum(String id,String field)=>filtered.where((e)=>e['taskId']==id).fold(0.0,(a,e)=>a+(double.tryParse('${e[field]}')??0));
-    final byUser=<String,double>{};
-    for(final e in filtered) {
-      if(e['taskId']=='ledger_prepared'||e['taskId']=='ledger_updated'){
-        final key=e['employeeName']?.toString()??e['uid'].toString();
-        byUser[key]=(byUser[key]??0)+(double.tryParse('${e['quantity']}')??0);
-      }
-    }
-    Widget kpi(String name,String value)=>SizedBox(width:210,height:132,child:Card(child:Padding(padding:const EdgeInsets.all(20),child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisAlignment:MainAxisAlignment.center,children:[Text(name,style:const TextStyle(color:TaskLogStyle.muted,fontWeight:FontWeight.w500)),const SizedBox(height:12),Text(value,style:const TextStyle(fontSize:29,fontWeight:FontWeight.w800,color:TaskLogStyle.ink))]))));
-    return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      const Text('Performance overview',style:TextStyle(fontWeight:FontWeight.w800,fontSize:28,color:TaskLogStyle.ink)),
-      const SizedBox(height:4),
-      const Text('Ledger activity, time spent and daily collections',style:TextStyle(color:TaskLogStyle.muted)),
-      const SizedBox(height:12),
-      Wrap(spacing:12,runSpacing:12,children:[kpi('Ledgers prepared',sum('ledger_prepared','quantity').toStringAsFixed(0)),
-        kpi('Ledgers updated',sum('ledger_updated','quantity').toStringAsFixed(0)),
-        kpi('Ledger hours',(sum('ledger_prepared','hours')+sum('ledger_updated','hours')).toStringAsFixed(1)),
-        kpi('Collections AED',sum('collection','quantity').toStringAsFixed(2))]),
-      const SizedBox(height:16),const Text('Ledger activity by employee',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
-      ...byUser.entries.map((e)=>Card(child:ListTile(title:Text(e.key),subtitle:LinearProgressIndicator(value:(e.value/25).clamp(0,1)),trailing:Text(e.value.toStringAsFixed(0))))),
-      const Text('Targets are ledger-only. Formal achievement requires assigned-day targets.',style:TextStyle(color:Colors.black54)),
-      const SizedBox(height:14),
-      OutlinedButton(onPressed:() async {setState(()=>loading=true);await load();},child:const Text('Refresh dashboard')),
-    ]);
-  }
+  Widget dashboard()=>PerformanceDashboard(
+    records: entries,
+    refresh: () async {setState(()=>loading=true);await load();},
+  );
 
   Widget branchSelector() => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('Select your working branch'), ...assignments.map((a) => TextButton(onPressed: () => setState(() { branch = a['branch']; category = a['category']; branchSelected = true; }), child: Text(a['branch'] + ' — ' + a['category'])))]));
 
@@ -235,12 +213,12 @@ class _PortalState extends State<Portal> {
           const NavigationRailDestination(icon:Icon(Icons.bar_chart),label:Text('Dashboard')),
           const NavigationRailDestination(icon:Icon(Icons.settings),label:Text('Settings'))],
         onDestinationSelected:(i)=>setState(()=>page=['Daily Tasks','Dashboard','Settings'][i])),
-      Expanded(child:SingleChildScrollView(padding:const EdgeInsets.symmetric(horizontal:36,vertical:32),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Expanded(child:Align(alignment:Alignment.topLeft,child:SingleChildScrollView(padding:const EdgeInsets.symmetric(horizontal:32,vertical:28),child:ConstrainedBox(constraints:const BoxConstraints(maxWidth:1400),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         if(error.isNotEmpty) Text(error,style:const TextStyle(color:Colors.red)),
         if(page=='Daily Tasks')entryPage(),
         if(page=='Dashboard')manager?dashboard():const Text('Manager access required'),
         if(page=='Settings')profile['role']=='ADMIN'?settings():const Text('Admin access required')
-      ])))
+      ])))))
     ]),
   );
 }
