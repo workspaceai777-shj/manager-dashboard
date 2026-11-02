@@ -153,13 +153,13 @@ class _PortalState extends State<Portal> {
         final id=t['id'].toString();
         qty.putIfAbsent(id,()=>TextEditingController());
         hours.putIfAbsent(id,()=>TextEditingController());
-        return Card(child:Padding(padding:const EdgeInsets.all(12),child:Wrap(
+        return ConstrainedBox(constraints:const BoxConstraints(maxWidth:940),child:Card(child:Padding(padding:const EdgeInsets.all(16),child:Wrap(
           crossAxisAlignment:WrapCrossAlignment.center,spacing:12,runSpacing:8,children:[
             SizedBox(width:360,child:Text(t['name'],style:const TextStyle(fontWeight:FontWeight.w500))),
             SizedBox(width:115,child:TextField(controller:qty[id],keyboardType:TextInputType.number,decoration:InputDecoration(labelText:id=='collection'?'AED':'Quantity',isDense:true,border:const OutlineInputBorder()))),
             SizedBox(width:115,child:TextField(controller:hours[id],keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Hours',isDense:true,border:OutlineInputBorder()))),
           ],
-        )));
+        ))));
       }),
       if(tasks.any((t)=>t['id']=='ledger_prepared')) ...[
         const SizedBox(height:16),
@@ -206,9 +206,9 @@ class _PortalState extends State<Portal> {
   @override Widget build(BuildContext context) => Scaffold(
     appBar:AppBar(toolbarHeight:72,title:const Row(children:[Icon(Icons.spa,color:TaskLogStyle.teal),SizedBox(width:12),Text('Ontario  |  TaskLog')]),actions:[
       TextButton(onPressed:()=>FirebaseAuth.instance.signOut(),child:const Text('Sign out'))]),
-    body:loading?const Center(child:CircularProgressIndicator()): !branchSelected ? branchSelector() : Row(children:[
-      NavigationRail(selectedIndex:['Daily Tasks','Dashboard','Settings'].indexOf(page).clamp(0,2),
-        labelType:NavigationRailLabelType.all,
+    body:loading?const Center(child:CircularProgressIndicator()): !branchSelected ? branchSelector() : Row(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      NavigationRail(minWidth:90,minExtendedWidth:205,extended:MediaQuery.sizeOf(context).width>1100,selectedIndex:['Daily Tasks','Dashboard','Settings'].indexOf(page).clamp(0,2),
+        leading:const Padding(padding:EdgeInsets.only(top:22,bottom:30),child:CircleAvatar(radius:24,backgroundColor:Color(0xFF285277),child:Icon(Icons.spa,color:Colors.white))),
         destinations:[const NavigationRailDestination(icon:Icon(Icons.edit_note),label:Text('Daily Tasks')),
           const NavigationRailDestination(icon:Icon(Icons.bar_chart),label:Text('Dashboard')),
           const NavigationRailDestination(icon:Icon(Icons.settings),label:Text('Settings'))],
