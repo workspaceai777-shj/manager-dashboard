@@ -1,0 +1,238 @@
+import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'api.dart';
+import 'config.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: AppConfig.firebase);
+  runApp(const OntarioApp());
+}
+
+class OntarioApp extends StatelessWidget {
+  const OntarioApp({super.key});
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    title: 'Ontario Staff Tasks',
+    theme: ThemeData(colorSchemeSeed: const Color(0xFF286585), useMaterial3: true),
+    home: StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snap) => snap.data == null ? const LoginPage() : const Portal(),
+    ),
+  );
+}
+
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+class _LoginPageState extends State<LoginPage> {
+  final email = TextEditingController(), password = TextEditingController();
+  String error = '';
+  bool busy = false;
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: Center(child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 420),
+      child: Card(child: Padding(padding: const EdgeInsets.all(24), child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.local_hospital, size: 54),
+          const SizedBox(height: 12),
+          const Text('Ontario Staff Portal', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          TextField(controller: email, decoration: const InputDecoration(labelText: 'Email')),
+          TextField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: 'Password')),
+          if (error.isNotEmpty) Text(error, style: const TextStyle(color: Colors.red)),
+          const SizedBox(height: 18),
+          FilledButton(onPressed: busy ? null : () async {
+            setState(() { busy = true; error = ''; });
+            try { await FirebaseAuth.instance.signInWithEmailAndPassword(email: email.text.trim(), password: password.text); }
+            catch (e) { setState(() => error = 'Sign-in failed. Check your credentials and account status.'); }
+            if (mounted) setState(() => busy = false);
+          }, child: const Text('Sign in'))
+        ],
+      ))),
+    )),
+  );
+}
+
+class Portal extends StatefulWidget {
+  const Portal({super.key});
+  @override State<Portal> createState() => _PortalState();
+}
+class _PortalState extends State<Portal> {
+  final api = StaffApi();
+  Map<String, dynamic> profile = {};
+  List<dynamic> assignments = [], tasks = [], entries = [], users = [];
+  String branch = '', category = '', page = 'Daily Tasks', error = '';
+  DateTime reportDate = DateTime.now();
+  bool loading = true;
+  final qty = <String, TextEditingController>{}, hours = <String, TextEditingController>{};
+  final emr = <TextEditingController>[], remark = <TextEditingController>[], mins = <TextEditingController>[];
+  final newUserEmail = TextEditingController(), newUserName = TextEditingController(), newUserUid = TextEditingController();
+  String newUserBranch = 'ONT-BB', newUserCategory = 'FRONT DESK';
+
+  @override void initState() { super.initState(); load(); }
+
+  Future<void> load() async {
+    try {
+      final b = Map<String, dynamic>.from(await api.request('bootstrap'));
+      profile = Map<String,dynamic>.from(b['profile'] ?? {});
+      assignments = List.from(b['assignments'] ?? []);
+      if (assignments.isNotEmpty) {
+        if (!assignments.any((x) => x['branch'] == branch && x['category'] == category)) {
+          branch = assignments.first['branch']; category = assignments.first['category'];
+        }
+        tasks = List.from((await api.request('tasks', body: {'branch': branch, 'category': category}))['tasks'] ?? []);
+      }
+      if (profile['role'] == 'ADMIN' || profile['role'] == 'MANAGER') {
+        entries = List.from((await api.request('dashboard', body: {'from': _date(DateTime(reportDate.year,reportDate.month,1)), 'to': _date(reportDate)}))['entries'] ?? []);
+      }
+      if (profile['role'] == 'ADMIN') users = List.from((await api.request('users'))['users'] ?? []);
+      error = '';
+    } catch (e) { error = e.toString(); }
+    if (mounted) setState(() => loading = false);
+  }
+  String _date(DateTime d) => '${d.year.toString().padLeft(4,"0")}-${d.month.toString().padLeft(2,"0")}-${d.day.toString().padLeft(2,"0")}';
+  bool get manager => profile['role'] == 'ADMIN' || profile['role'] == 'MANAGER';
+  void message(String s) { if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s))); }
+
+  Future<void> saveTasks() async {
+    final data = <Map<String,dynamic>>[];
+    for (final task in tasks) {
+      final id = task['id'].toString();
+      final q = double.tryParse(qty[id]?.text ?? '') ?? 0;
+      final h = double.tryParse(hours[id]?.text ?? '') ?? 0;
+      if(q > 0 || h > 0) data.add({'taskId': id, 'quantity': q, 'hours': h});
+    }
+    final ledgerTask = tasks.where((t)=> t['id'] == 'ledger_prepared').toList();
+    if(ledgerTask.isNotEmpty) {
+      for (int i=0;i<emr.length;i++) {
+        final m = int.tryParse(mins[i].text) ?? 0;
+        if (emr[i].text.trim().isNotEmpty && m>0) {
+          data.add({'taskId':'ledger_prepared','emr':emr[i].text.trim(),
+            'remarks':remark[i].text.trim(),'quantity':1,'hours':m/60});
+        }
+      }
+    }
+    if(data.isEmpty){message('Enter at least one task');return;}
+    try {
+      await api.request('save',body:{'branch':branch,'category':category,'date':_date(reportDate),'entries':data});
+      for(final c in qty.values){c.clear();}
+      for(final c in hours.values){c.clear();}
+      emr.clear();remark.clear();mins.clear();setState((){});
+      message('Tasks saved');
+    } catch (e) {message(e.toString());}
+  }
+
+  Widget entryPage() {
+    if(assignments.isEmpty) return const Text('No branch/category assignment. Contact your administrator.');
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Wrap(spacing:12,runSpacing:8,children: [
+        DropdownButton<String>(value:'$branch|$category',items:assignments.map<DropdownMenuItem<String>>((a){
+          final v='${a['branch']}|${a['category']}';return DropdownMenuItem(value:v,child:Text('${a['branch']} — ${a['category']}'));
+        }).toList(),onChanged:(v) async {
+          if(v==null)return;
+          final x=v.split('|'); setState((){branch=x[0];category=x[1];tasks=[];});
+          try {final r=await api.request('tasks',body:{'branch':branch,'category':category});setState(()=>tasks=List.from(r['tasks']));}
+          catch(e){message(e.toString());}
+        }),
+        OutlinedButton.icon(onPressed:() async {final x=await showDatePicker(context:context,initialDate:reportDate,firstDate:DateTime(2024),lastDate:DateTime(2035));if(x!=null)setState(()=>reportDate=x);}, icon:const Icon(Icons.calendar_month),label:Text(_date(reportDate))),
+      ]),
+      const SizedBox(height:18), const Text('Daily activities — quantity and hours',style:TextStyle(fontWeight:FontWeight.bold,fontSize:18)),
+      const SizedBox(height:8),
+      ...tasks.where((t)=>t['id']!='ledger_prepared').map((t){
+        final id=t['id'].toString();
+        qty.putIfAbsent(id,()=>TextEditingController());
+        hours.putIfAbsent(id,()=>TextEditingController());
+        return Card(child:Padding(padding:const EdgeInsets.all(12),child:Wrap(
+          crossAxisAlignment:WrapCrossAlignment.center,spacing:12,runSpacing:8,children:[
+            SizedBox(width:360,child:Text(t['name'],style:const TextStyle(fontWeight:FontWeight.w500))),
+            SizedBox(width:115,child:TextField(controller:qty[id],keyboardType:TextInputType.number,decoration:InputDecoration(labelText:id=='collection'?'AED':'Quantity',isDense:true,border:const OutlineInputBorder()))),
+            SizedBox(width:115,child:TextField(controller:hours[id],keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Hours',isDense:true,border:OutlineInputBorder()))),
+          ],
+        )));
+      }),
+      if(tasks.any((t)=>t['id']=='ledger_prepared')) ...[
+        const SizedBox(height:16),
+        const Text('Individual ledger preparation — EMR-wise',style:TextStyle(fontWeight:FontWeight.bold,fontSize:18)),
+        const Text('One EMR per row; preparation quantity and hours are calculated automatically.'),
+        ...List.generate(emr.length,(i)=>Card(child:Padding(padding:const EdgeInsets.all(10),
+          child:Wrap(spacing:10,runSpacing:10,children:[
+            SizedBox(width:150,child:TextField(controller:emr[i],decoration:const InputDecoration(labelText:'EMR No.'))),
+            SizedBox(width:260,child:TextField(controller:remark[i],decoration:const InputDecoration(labelText:'Remarks'))),
+            SizedBox(width:145,child:TextField(controller:mins[i],keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Minutes'))),
+            IconButton(onPressed:()=>setState((){emr.removeAt(i);remark.removeAt(i);mins.removeAt(i);}),icon:const Icon(Icons.delete_outline))
+          ])))),
+        OutlinedButton.icon(onPressed:()=>setState((){emr.add(TextEditingController());remark.add(TextEditingController());mins.add(TextEditingController());}),icon:const Icon(Icons.add),label:const Text('Add EMR')),
+      ],
+      const SizedBox(height:20),
+      FilledButton.icon(onPressed:saveTasks,icon:const Icon(Icons.save),label:const Text('Save daily report')),
+    ]);
+  }
+
+  Widget dashboard() {
+    final filtered = entries.where((e)=>e['branch']==branch || branch.isEmpty).toList();
+    double sum(String id,String field)=>filtered.where((e)=>e['taskId']==id).fold(0.0,(a,e)=>a+(double.tryParse('${e[field]}')??0));
+    final byUser=<String,double>{};
+    for(final e in filtered) {
+      if(e['taskId']=='ledger_prepared'||e['taskId']=='ledger_updated'){
+        final key=e['employeeName']?.toString()??e['uid'].toString();
+        byUser[key]=(byUser[key]??0)+(double.tryParse('${e['quantity']}')??0);
+      }
+    }
+    Widget kpi(String name,String value)=>Card(child:Padding(padding:const EdgeInsets.all(20),child:Column(mainAxisSize:MainAxisSize.min,children:[Text(name),const SizedBox(height:8),Text(value,style:const TextStyle(fontSize:23,fontWeight:FontWeight.bold))])));
+    return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      const Text('Manager dashboard',style:TextStyle(fontWeight:FontWeight.bold,fontSize:23)),
+      const SizedBox(height:12),
+      Wrap(children:[kpi('Ledgers prepared',sum('ledger_prepared','quantity').toStringAsFixed(0)),
+        kpi('Ledgers updated',sum('ledger_updated','quantity').toStringAsFixed(0)),
+        kpi('Ledger hours',(sum('ledger_prepared','hours')+sum('ledger_updated','hours')).toStringAsFixed(1)),
+        kpi('Collections AED',sum('collection','quantity').toStringAsFixed(2))]),
+      const SizedBox(height:16),const Text('Ledger activity by employee',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
+      ...byUser.entries.map((e)=>Card(child:ListTile(title:Text(e.key),subtitle:LinearProgressIndicator(value:(e.value/25).clamp(0,1)),trailing:Text(e.value.toStringAsFixed(0))))),
+      const Text('Targets are ledger-only. Formal achievement requires assigned-day targets.',style:TextStyle(color:Colors.black54)),
+      const SizedBox(height:14),
+      OutlinedButton(onPressed:() async {setState(()=>loading=true);await load();},child:const Text('Refresh dashboard')),
+    ]);
+  }
+
+  Widget settings() {
+    return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      const Text('Admin — staff assignments',style:TextStyle(fontSize:22,fontWeight:FontWeight.bold)),
+      const Text('Create staff authentication accounts in Firebase Authentication first, then register the UID here.'),
+      TextField(controller:newUserUid,decoration:const InputDecoration(labelText:'Firebase User UID')),
+      TextField(controller:newUserName,decoration:const InputDecoration(labelText:'Staff name')),
+      TextField(controller:newUserEmail,decoration:const InputDecoration(labelText:'Email')),
+      DropdownButton<String>(value:newUserBranch,items:['ONT-BB','ONT-BR1'].map((e)=>DropdownMenuItem(value:e,child:Text(e))).toList(),onChanged:(v)=>setState(()=>newUserBranch=v!)),
+      DropdownButton<String>(value:newUserCategory,items:['FRONT DESK','INSURANCE USER'].map((e)=>DropdownMenuItem(value:e,child:Text(e))).toList(),onChanged:(v)=>setState(()=>newUserCategory=v!)),
+      FilledButton(onPressed:() async {try{
+        await api.request('upsertUser',body:{'uid':newUserUid.text,'name':newUserName.text,'email':newUserEmail.text,'role':'STAFF','branch':newUserBranch,'category':newUserCategory});
+        message('Assignment saved'); await load();
+      } catch(e){message(e.toString());}},child:const Text('Add user / assignment')),
+      const SizedBox(height:15),
+      ...users.map((u)=>ListTile(title:Text('${u['name']} — ${u['role']}'),subtitle:Text('${u['email']} | ${u['branch']} / ${u['category']}'))),
+    ]);
+  }
+  @override Widget build(BuildContext context) => Scaffold(
+    appBar:AppBar(title:const Text('Ontario Ayurvedic Medical Centre'),actions:[
+      TextButton(onPressed:()=>FirebaseAuth.instance.signOut(),child:const Text('Sign out'))]),
+    body:loading?const Center(child:CircularProgressIndicator()): Row(children:[
+      NavigationRail(selectedIndex:['Daily Tasks','Dashboard','Settings'].indexOf(page).clamp(0,2),
+        labelType:NavigationRailLabelType.all,
+        destinations:[const NavigationRailDestination(icon:Icon(Icons.edit_note),label:Text('Daily Tasks')),
+          const NavigationRailDestination(icon:Icon(Icons.bar_chart),label:Text('Dashboard')),
+          const NavigationRailDestination(icon:Icon(Icons.settings),label:Text('Settings'))],
+        onDestinationSelected:(i)=>setState(()=>page=['Daily Tasks','Dashboard','Settings'][i])),
+      Expanded(child:SingleChildScrollView(padding:const EdgeInsets.all(22),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        if(error.isNotEmpty) Text(error,style:const TextStyle(color:Colors.red)),
+        if(page=='Daily Tasks')entryPage(),
+        if(page=='Dashboard')manager?dashboard():const Text('Manager access required'),
+        if(page=='Settings')profile['role']=='ADMIN'?settings():const Text('Admin access required')
+      ])))
+    ]),
+  );
+}
