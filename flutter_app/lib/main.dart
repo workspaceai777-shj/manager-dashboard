@@ -69,6 +69,7 @@ class _PortalState extends State<Portal> {
   List<dynamic> assignments = [], tasks = [], entries = [], users = [];
   String branch = '', category = '', page = 'Daily Tasks', error = '';
   DateTime reportDate = DateTime.now();
+  bool branchSelected = false;
   bool loading = true;
   final qty = <String, TextEditingController>{}, hours = <String, TextEditingController>{};
   final emr = <TextEditingController>[], remark = <TextEditingController>[], mins = <TextEditingController>[];
@@ -200,6 +201,8 @@ class _PortalState extends State<Portal> {
     ]);
   }
 
+  Widget branchSelector() => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('Select your working branch'), ...assignments.map((a) => TextButton(onPressed: () => setState(() { branch = a['branch']; category = a['category']; branchSelected = true; }), child: Text(a['branch'] + ' — ' + a['category'])))]));
+
   Widget settings() {
     return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       const Text('Admin — staff assignments',style:TextStyle(fontSize:22,fontWeight:FontWeight.bold)),
@@ -220,7 +223,7 @@ class _PortalState extends State<Portal> {
   @override Widget build(BuildContext context) => Scaffold(
     appBar:AppBar(title:const Text('Ontario Ayurvedic Medical Centre'),actions:[
       TextButton(onPressed:()=>FirebaseAuth.instance.signOut(),child:const Text('Sign out'))]),
-    body:loading?const Center(child:CircularProgressIndicator()): Row(children:[
+    body:loading?const Center(child:CircularProgressIndicator()): !branchSelected ? branchSelector() : Row(children:[
       NavigationRail(selectedIndex:['Daily Tasks','Dashboard','Settings'].indexOf(page).clamp(0,2),
         labelType:NavigationRailLabelType.all,
         destinations:[const NavigationRailDestination(icon:Icon(Icons.edit_note),label:Text('Daily Tasks')),
