@@ -66,13 +66,37 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
     final max=quantityTasks.isEmpty?1.0:quantityTasks.first.value+1;
     const chartColors=[Color(0xFF0E9488),Color(0xFF397DCE),Color(0xFF8D66D5),
       Color(0xFFE6A34C),Color(0xFFE67988),Color(0xFF52B9AA)];
-    final chart1=panel('Task quantities',SizedBox(height:280,child:quantityTasks.isEmpty
+    final chart1=panel('Task quantities',SizedBox(height:340,child:quantityTasks.isEmpty
       ?const Center(child:Text('No records for selected filters'))
       :BarChart(BarChartData(maxY:max*1.18,gridData:const FlGridData(show:false),
         borderData:FlBorderData(show:false),
         titlesData:const FlTitlesData(topTitles:AxisTitles(sideTitles:SideTitles(showTitles:false)),
           rightTitles:AxisTitles(sideTitles:SideTitles(showTitles:false)),
-          bottomTitles:AxisTitles(sideTitles:SideTitles(showTitles:false))),
+          bottomTitles:AxisTitles(sideTitles:SideTitles(
+            showTitles:true,
+            reservedSize:74,
+            interval:1,
+            getTitlesWidget:(value,meta) {
+              final index=value.toInt();
+              final visible=quantityTasks.take(9).toList();
+              if(value!=index.toDouble() || index<0 || index>=visible.length) {
+                return const SizedBox.shrink();
+              }
+              final label=visible[index].key.replaceAll('_',' ');
+              return SideTitleWidget(
+                meta:meta,
+                space:10,
+                child:SizedBox(
+                  width:72,
+                  child:Text(label,
+                    maxLines:3,
+                    overflow:TextOverflow.ellipsis,
+                    textAlign:TextAlign.center,
+                    style:const TextStyle(fontSize:10,color:TaskLogStyle.muted,height:1.15)),
+                ),
+              );
+            },
+          ))),
         barGroups:quantityTasks.take(9).toList().asMap().entries.map((e)=>
           BarChartGroupData(x:e.key,barRods:[BarChartRodData(toY:e.value.value,
             color:TaskLogStyle.teal,width:24,
