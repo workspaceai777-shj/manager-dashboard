@@ -5,6 +5,7 @@ import 'api.dart';
 import 'config.dart';
 import 'tasklog_style.dart';
 import 'performance_dashboard.dart';
+import 'admin_settings.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -203,22 +204,72 @@ class _PortalState extends State<Portal> {
       ...users.map((u)=>ListTile(title:Text('${u['name']} — ${u['role']}'),subtitle:Text('${u['email']} | ${u['branch']} / ${u['category']}'))),
     ]);
   }
-  @override Widget build(BuildContext context) => Scaffold(
-    appBar:AppBar(toolbarHeight:72,title:const Row(children:[Icon(Icons.spa,color:TaskLogStyle.teal),SizedBox(width:12),Text('Ontario  |  TaskLog')]),actions:[
-      TextButton(onPressed:()=>FirebaseAuth.instance.signOut(),child:const Text('Sign out'))]),
-    body:loading?const Center(child:CircularProgressIndicator()): !branchSelected ? branchSelector() : Row(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      NavigationRail(minWidth:90,minExtendedWidth:205,extended:MediaQuery.sizeOf(context).width>1100,selectedIndex:['Daily Tasks','Dashboard','Settings'].indexOf(page).clamp(0,2),
-        leading:const Padding(padding:EdgeInsets.only(top:22,bottom:30),child:CircleAvatar(radius:24,backgroundColor:Color(0xFF285277),child:Icon(Icons.spa,color:Colors.white))),
-        destinations:[const NavigationRailDestination(icon:Icon(Icons.edit_note),label:Text('Daily Tasks')),
-          const NavigationRailDestination(icon:Icon(Icons.bar_chart),label:Text('Dashboard')),
-          const NavigationRailDestination(icon:Icon(Icons.settings),label:Text('Settings'))],
-        onDestinationSelected:(i)=>setState(()=>page=['Daily Tasks','Dashboard','Settings'][i])),
-      Expanded(child:Align(alignment:Alignment.topLeft,child:SingleChildScrollView(padding:const EdgeInsets.symmetric(horizontal:32,vertical:28),child:ConstrainedBox(constraints:const BoxConstraints(maxWidth:1400),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        if(error.isNotEmpty) Text(error,style:const TextStyle(color:Colors.red)),
-        if(page=='Daily Tasks')entryPage(),
-        if(page=='Dashboard')manager?dashboard():const Text('Manager access required'),
-        if(page=='Settings')profile['role']=='ADMIN'?settings():const Text('Admin access required')
-      ])))))
-    ]),
-  );
+  Widget responsivePortal(BuildContext context) {
+    final narrow = MediaQuery.sizeOf(context).width < 720;
+    final pages = ['Daily Tasks','Dashboard','Settings'];
+    final index = pages.indexOf(page).clamp(0,2);
+    final content = Align(
+      alignment: Alignment.topLeft,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.symmetric(horizontal:narrow?16:32,vertical:narrow?18:28),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth:1400),
+          child: Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            if(error.isNotEmpty) Text(error,style:const TextStyle(color:Colors.red)),
+            if(page=='Daily Tasks')entryPage(),
+            if(page=='Dashboard')manager?dashboard():const Text('Manager access required'),
+            if(page=='Settings')profile['role']=='ADMIN'?const AdminSettings():const Text('Admin access required'),
+          ]),
+        ),
+      ),
+    );
+    if (narrow) {
+      return Scaffold(
+        appBar:AppBar(title:const Text('Ontario | TaskLog'),actions:[
+          IconButton(onPressed:()=>FirebaseAuth.instance.signOut(),
+            icon:const Icon(Icons.logout),tooltip:'Sign out'),
+        ]),
+        body:content,
+        bottomNavigationBar:NavigationBar(
+          selectedIndex:index,
+          onDestinationSelected:(i)=>setState(()=>page=pages[i]),
+          destinations:const [
+            NavigationDestination(icon:Icon(Icons.edit_note),label:'Daily Tasks'),
+            NavigationDestination(icon:Icon(Icons.bar_chart),label:'Dashboard'),
+            NavigationDestination(icon:Icon(Icons.settings),label:'Settings'),
+          ],
+        ),
+      );
+    }
+    return Scaffold(
+      appBar:AppBar(toolbarHeight:72,title:const Row(children:[
+        Icon(Icons.spa,color:TaskLogStyle.teal),SizedBox(width:12),
+        Text('Ontario  |  TaskLog')]),actions:[
+        TextButton(onPressed:()=>FirebaseAuth.instance.signOut(),child:const Text('Sign out')),
+      ]),
+      body:Row(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        NavigationRail(
+          minWidth:90,minExtendedWidth:205,
+          extended:MediaQuery.sizeOf(context).width>1100,
+          selectedIndex:index,
+          leading:const Padding(padding:EdgeInsets.only(top:22,bottom:30),
+            child:CircleAvatar(radius:24,backgroundColor:Color(0xFF285277),
+              child:Icon(Icons.spa,color:Colors.white))),
+          destinations:const [
+            NavigationRailDestination(icon:Icon(Icons.edit_note),label:Text('Daily Tasks')),
+            NavigationRailDestination(icon:Icon(Icons.bar_chart),label:Text('Dashboard')),
+            NavigationRailDestination(icon:Icon(Icons.settings),label:Text('Settings')),
+          ],
+          onDestinationSelected:(i)=>setState(()=>page=pages[i]),
+        ),
+        Expanded(child:content),
+      ]),
+    );
+  }
+
+  @override Widget build(BuildContext context) => loading
+      ? const Scaffold(body:Center(child:CircularProgressIndicator()))
+      : !branchSelected
+          ? Scaffold(body:branchSelector())
+          : responsivePortal(context);
 }
