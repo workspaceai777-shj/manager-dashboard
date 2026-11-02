@@ -60,3 +60,4 @@ The backend `api/v2.js` can run on Vercel. A Flutter Web build must first be gen
 - Dashboard currently shows ledger totals, hours, collection and employee counts; further graphical target and timeline widgets are needed before calling it complete.
 - The target remains **ledger-only**; do not use other tasks as performance targets.
 - The app has not yet been built/tested with Flutter SDK in this environment.
+- 
