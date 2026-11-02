@@ -79,6 +79,22 @@ function validDate(v) {return /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Dat
 const result=(res,status,data)=>res.status(status).json(data);
 
 export default async function handler(req,res){
+  // Flutter Web uses a cross-origin Authorization header, which requires
+  // browsers to perform an OPTIONS preflight before the authenticated POST.
+  const origin = req.headers.origin;
+  const configuredOrigins = (process.env.ALLOWED_WEB_ORIGINS || '')
+    .split(',').map(v => v.trim()).filter(Boolean);
+  const localDevelopment = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin || '');
+  const trustedOrigin = !!origin && (localDevelopment || configuredOrigins.includes(origin));
+  res.setHeader('Vary', 'Origin');
+  if (trustedOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.setHeader('Access-Control-Max-Age', '600');
+  }
+  if (origin && !trustedOrigin) return result(res,403,{error:'Origin not allowed'});
+  if (req.method === 'OPTIONS') return res.status(204).end();
   if(req.method!=='POST')return result(res,405,{error:'POST required'});
   try{
     if(!admin.apps.length)return result(res,503,{error:'Firebase Admin credentials not configured'});
