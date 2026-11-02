@@ -73,8 +73,8 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
       ?const Center(child:Text('No records for selected filters'))
       :BarChart(BarChartData(maxY:max*1.18,gridData:const FlGridData(show:false),
         borderData:FlBorderData(show:false),
-        titlesData:const FlTitlesData(topTitles:AxisTitles(sideTitles:SideTitles(showTitles:false)),
-          rightTitles:AxisTitles(sideTitles:SideTitles(showTitles:false)),
+        titlesData:FlTitlesData(topTitles:const AxisTitles(sideTitles:SideTitles(showTitles:false)),
+          rightTitles:const AxisTitles(sideTitles:SideTitles(showTitles:false)),
           bottomTitles:AxisTitles(sideTitles:SideTitles(
             showTitles:true,
             reservedSize:74,
