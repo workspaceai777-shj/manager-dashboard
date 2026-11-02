@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'api.dart';
 import 'config.dart';
+import 'tasklog_style.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,7 +17,7 @@ class OntarioApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
     title: 'Ontario Staff Tasks',
-    theme: ThemeData(colorSchemeSeed: const Color(0xFF286585), useMaterial3: true),
+    theme: TaskLogStyle.light,
     home: StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snap) => snap.data == null ? const LoginPage() : const Portal(),
@@ -185,11 +186,13 @@ class _PortalState extends State<Portal> {
         byUser[key]=(byUser[key]??0)+(double.tryParse('${e['quantity']}')??0);
       }
     }
-    Widget kpi(String name,String value)=>Card(child:Padding(padding:const EdgeInsets.all(20),child:Column(mainAxisSize:MainAxisSize.min,children:[Text(name),const SizedBox(height:8),Text(value,style:const TextStyle(fontSize:23,fontWeight:FontWeight.bold))])));
+    Widget kpi(String name,String value)=>SizedBox(width:210,height:132,child:Card(child:Padding(padding:const EdgeInsets.all(20),child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisAlignment:MainAxisAlignment.center,children:[Text(name,style:const TextStyle(color:TaskLogStyle.muted,fontWeight:FontWeight.w500)),const SizedBox(height:12),Text(value,style:const TextStyle(fontSize:29,fontWeight:FontWeight.w800,color:TaskLogStyle.ink))]))));
     return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      const Text('Manager dashboard',style:TextStyle(fontWeight:FontWeight.bold,fontSize:23)),
+      const Text('Performance overview',style:TextStyle(fontWeight:FontWeight.w800,fontSize:28,color:TaskLogStyle.ink)),
+      const SizedBox(height:4),
+      const Text('Ledger activity, time spent and daily collections',style:TextStyle(color:TaskLogStyle.muted)),
       const SizedBox(height:12),
-      Wrap(children:[kpi('Ledgers prepared',sum('ledger_prepared','quantity').toStringAsFixed(0)),
+      Wrap(spacing:12,runSpacing:12,children:[kpi('Ledgers prepared',sum('ledger_prepared','quantity').toStringAsFixed(0)),
         kpi('Ledgers updated',sum('ledger_updated','quantity').toStringAsFixed(0)),
         kpi('Ledger hours',(sum('ledger_prepared','hours')+sum('ledger_updated','hours')).toStringAsFixed(1)),
         kpi('Collections AED',sum('collection','quantity').toStringAsFixed(2))]),
@@ -221,7 +224,7 @@ class _PortalState extends State<Portal> {
     ]);
   }
   @override Widget build(BuildContext context) => Scaffold(
-    appBar:AppBar(title:const Text('Ontario Ayurvedic Medical Centre'),actions:[
+    appBar:AppBar(toolbarHeight:72,title:const Row(children:[Icon(Icons.spa,color:TaskLogStyle.teal),SizedBox(width:12),Text('Ontario  |  TaskLog')]),actions:[
       TextButton(onPressed:()=>FirebaseAuth.instance.signOut(),child:const Text('Sign out'))]),
     body:loading?const Center(child:CircularProgressIndicator()): !branchSelected ? branchSelector() : Row(children:[
       NavigationRail(selectedIndex:['Daily Tasks','Dashboard','Settings'].indexOf(page).clamp(0,2),
@@ -230,7 +233,7 @@ class _PortalState extends State<Portal> {
           const NavigationRailDestination(icon:Icon(Icons.bar_chart),label:Text('Dashboard')),
           const NavigationRailDestination(icon:Icon(Icons.settings),label:Text('Settings'))],
         onDestinationSelected:(i)=>setState(()=>page=['Daily Tasks','Dashboard','Settings'][i])),
-      Expanded(child:SingleChildScrollView(padding:const EdgeInsets.all(22),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Expanded(child:SingleChildScrollView(padding:const EdgeInsets.symmetric(horizontal:36,vertical:32),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         if(error.isNotEmpty) Text(error,style:const TextStyle(color:Colors.red)),
         if(page=='Daily Tasks')entryPage(),
         if(page=='Dashboard')manager?dashboard():const Text('Manager access required'),
