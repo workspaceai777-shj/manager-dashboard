@@ -38,8 +38,9 @@ class _LoginPageState extends State<LoginPage> {
   bool busy = false;
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: Center(child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 420),
+    body: SafeArea(child: Center(child: SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 420),
       child: Card(child: Padding(padding: const EdgeInsets.all(24), child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -58,7 +59,7 @@ class _LoginPageState extends State<LoginPage> {
           }, child: const Text('Sign in'))
         ],
       ))),
-    )),
+    ))),
   );
 }
 
@@ -287,8 +288,8 @@ class _PortalState extends State<Portal> {
     refresh: () async {setState(()=>loading=true);await load();},
   );
 
-  Widget branchSelector() => Center(
-    child: ConstrainedBox(
+  Widget branchSelector() => SafeArea(child: Center(
+    child: SingleChildScrollView(padding:const EdgeInsets.all(16),child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 520),
       child: Card(
         child: Padding(
@@ -316,8 +317,8 @@ class _PortalState extends State<Portal> {
           ]),
         ),
       ),
-    ),
-  );
+    )),
+  ));
 
   Widget settings() {
     return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
