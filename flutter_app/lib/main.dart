@@ -418,7 +418,7 @@ class _PortalState extends State<Portal> {
   }
   Widget responsivePortal(BuildContext context) {
     final narrow = MediaQuery.sizeOf(context).width < 720;
-    final pages = ['Daily Tasks','Dashboard','Settings'];
+    final pages = manager ? ['Daily Tasks','Dashboard','Settings'] : ['Daily Tasks','My Dashboard'];
     final index = pages.indexOf(page).clamp(0,2);
     final content = Align(
       alignment: Alignment.topLeft,
@@ -429,8 +429,8 @@ class _PortalState extends State<Portal> {
           child: Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
             if(error.isNotEmpty) Text(error,style:const TextStyle(color:Colors.red)),
             if(page=='Daily Tasks')entryPage(),
-            if(page=='Dashboard')manager?dashboard():const Text('Manager access required'),
-            if(page=='Settings')profile['role']=='ADMIN'?const AdminSettings():const Text('Admin access required'),
+            if(page=='Dashboard' || page=='My Dashboard')dashboard(),
+            if(page=='Settings' && manager)const AdminSettings(),
           ]),
         ),
       ),
@@ -445,11 +445,11 @@ class _PortalState extends State<Portal> {
         bottomNavigationBar:SafeArea(top:false,child:NavigationBar(
           selectedIndex:index,
           onDestinationSelected:(i)=>setState(()=>page=pages[i]),
-          destinations:const [
-            NavigationDestination(icon:Icon(Icons.edit_note),label:'Daily Tasks'),
-            NavigationDestination(icon:Icon(Icons.bar_chart),label:'Dashboard'),
-            NavigationDestination(icon:Icon(Icons.settings),label:'Settings'),
-          ],
+          destinations:pages.map((p) => NavigationDestination(
+            icon:Icon(p=='Daily Tasks'?Icons.edit_note:
+              p=='Settings'?Icons.settings:Icons.bar_chart),
+            label:p,
+          )).toList(),
         )),
       );
     }
@@ -466,11 +466,11 @@ class _PortalState extends State<Portal> {
           selectedIndex:index,
           leading:const Padding(padding:EdgeInsets.only(top:22,bottom:30),
             child:TaskLogBrandMark(size:48)),
-          destinations:const [
-            NavigationRailDestination(icon:Icon(Icons.edit_note),label:Text('Daily Tasks')),
-            NavigationRailDestination(icon:Icon(Icons.bar_chart),label:Text('Dashboard')),
-            NavigationRailDestination(icon:Icon(Icons.settings),label:Text('Settings')),
-          ],
+          destinations:pages.map((p) => NavigationRailDestination(
+            icon:Icon(p=='Daily Tasks'?Icons.edit_note:
+              p=='Settings'?Icons.settings:Icons.bar_chart),
+            label:Text(p),
+          )).toList(),
           onDestinationSelected:(i)=>setState(()=>page=pages[i]),
         ),
         Expanded(child:content),
