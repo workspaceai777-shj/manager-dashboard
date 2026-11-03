@@ -176,11 +176,11 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                 final chartMaxY = max * 1.18;
                 final leftReserved = compact ? 32.0 : 40.0;
                 const bottomReserved = 74.0;
-                const chartHeight = 340.0 - bottomReserved;
-                final rodWidth = compact ? 18.0 : 22.0;
+                final rodWidth = compact ? 20.0 : 24.0;
                 return Stack(
                   children: [
                     BarChart(BarChartData(
+                      alignment: BarChartAlignment.spaceAround,
                       maxY: chartMaxY,
                       gridData: const FlGridData(show: false),
                       borderData: FlBorderData(show: false),
@@ -248,42 +248,48 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                       top: 0,
                       bottom: bottomReserved,
                       child: IgnorePointer(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: visible.map((entry) {
-                            final value = entry.value;
-                            final barHeight =
-                                ((value / chartMaxY) * chartHeight)
-                                    .clamp(0.0, chartHeight);
-                            final qtyText = value % 1 == 0
-                                ? value.toStringAsFixed(0)
-                                : value.toStringAsFixed(1);
-                            final insideBar = barHeight >= 18;
-                            return Expanded(
-                              child: Align(
-                                alignment: Alignment.bottomCenter,
-                                child: SizedBox(
+                        child: LayoutBuilder(
+                          builder: (context, plot) {
+                            final slotWidth = plot.maxWidth / visible.length;
+                            return Stack(
+                              clipBehavior: Clip.none,
+                              children: visible.asMap().entries.map((item) {
+                                final i = item.key;
+                                final value = item.value.value;
+                                final barHeight =
+                                    ((value / chartMaxY) * plot.maxHeight)
+                                        .clamp(0.0, plot.maxHeight);
+                                final qtyText = value % 1 == 0
+                                    ? value.toInt().toString()
+                                    : value.toStringAsFixed(1);
+                                final insideBar = barHeight >= 14;
+                                final barLeft =
+                                    (i + 0.5) * slotWidth - rodWidth / 2;
+                                return Positioned(
+                                  left: barLeft,
                                   width: rodWidth,
-                                  height:
-                                      insideBar ? barHeight : barHeight + 22,
-                                  child: Align(
-                                    alignment: insideBar
-                                        ? Alignment.center
-                                        : Alignment.topCenter,
+                                  bottom: insideBar ? 0 : barHeight + 4,
+                                  height: insideBar ? barHeight : 24,
+                                  child: Center(
                                     child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 2, vertical: 2),
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 2,
+                                        vertical:
+                                            insideBar && barHeight > 20 ? 3 : 1,
+                                      ),
                                       child: FittedBox(
                                         fit: BoxFit.scaleDown,
                                         child: RotatedBox(
                                           quarterTurns: 3,
                                           child: Text(
                                             qtyText,
+                                            textAlign: TextAlign.center,
                                             style: TextStyle(
-                                              fontSize: compact ? 10 : 11,
+                                              fontSize: compact ? 10.5 : 11.5,
                                               fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.2,
                                               color: insideBar
-                                                  ? const Color(0xFF061425)
+                                                  ? const Color(0xFF041421)
                                                   : TaskLogStyle.ink,
                                               height: 1.0,
                                             ),
@@ -292,10 +298,10 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                                       ),
                                     ),
                                   ),
-                                ),
-                              ),
+                                );
+                              }).toList(),
                             );
-                          }).toList(),
+                          },
                         ),
                       ),
                     ),
