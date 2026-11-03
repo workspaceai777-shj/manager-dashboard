@@ -161,6 +161,14 @@ class Portal extends StatefulWidget {
 }
 
 class _PortalState extends State<Portal> {
+  static const _yesNoTaskIds = <String>{
+    'accounts_collection_check',
+    'accounts_dha_attendance',
+    'accounts_petty_cash',
+    'accounts_month_end',
+    'accounts_reception',
+  };
+
   late final StaffApi api = widget.api ?? StaffApi();
   Map<String, dynamic> profile = {};
   List<dynamic> assignments = [], tasks = [], entries = [], users = [];
@@ -528,10 +536,22 @@ class _PortalState extends State<Portal> {
       const Text('Activities',
           style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
       const SizedBox(height: 8),
-      ...tasks.where((t) => t['id'] != 'ledger_prepared').map((t) {
+      ...tasks
+          .where((t) => t['id'] != 'ledger_prepared')
+          .toList()
+          .asMap()
+          .entries
+          .map((entry) {
+        final activityNumber = entry.key + 1;
+        final t = entry.value;
         final id = t['id'].toString();
         qty.putIfAbsent(id, () => TextEditingController());
         hours.putIfAbsent(id, () => TextEditingController());
+        final isYesNo = _yesNoTaskIds.contains(id) ||
+            (category == 'ACCOUNTS' &&
+                const {2, 3, 5, 6, 7}.contains(activityNumber));
+        final yesNoValue =
+            (double.tryParse(qty[id]?.text ?? '') ?? 0) >= 1 ? 'Yes' : 'No';
         return ConstrainedBox(
           key: ValueKey('$branch|$category|$id'),
           constraints: const BoxConstraints(maxWidth: 940),
@@ -540,26 +560,69 @@ class _PortalState extends State<Portal> {
               padding: const EdgeInsets.all(16),
               child: LayoutBuilder(builder: (context, constraints) {
                 final compact = constraints.maxWidth < 650;
-                final quantityField = TextField(
-                  controller: qty[id],
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                      labelText: id == 'collection' ? 'AED' : 'Quantity'),
-                );
+                final Widget quantityField = isYesNo
+                    ? InputDecorator(
+                        decoration:
+                            const InputDecoration(labelText: 'Yes / No'),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            key: ValueKey('yesno-$id-$yesNoValue'),
+                            isExpanded: true,
+                            isDense: true,
+                            value: yesNoValue,
+                            items: const [
+                              DropdownMenuItem(value: 'No', child: Text('No')),
+                              DropdownMenuItem(
+                                  value: 'Yes', child: Text('Yes')),
+                            ],
+                            onChanged: (v) {
+                              setState(() {
+                                qty[id]!.text = v == 'Yes' ? '1' : '0';
+                              });
+                            },
+                          ),
+                        ),
+                      )
+                    : TextField(
+                        controller: qty[id],
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: InputDecoration(
+                            labelText: id == 'collection' ? 'AED' : 'Quantity'),
+                      );
                 final hoursField = TextField(
                   controller: hours[id],
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(labelText: 'Hours'),
                 );
+                final numberedTitle = Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$activityNumber. ',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: compact ? 15 : 14,
+                        color: TaskLogStyle.teal,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        t['name'].toString(),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: compact ? 15 : 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
                 if (compact) {
                   return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(t['name'].toString(),
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 15)),
+                        numberedTitle,
                         const SizedBox(height: 14),
                         Row(children: [
                           Expanded(child: quantityField),
@@ -569,10 +632,7 @@ class _PortalState extends State<Portal> {
                       ]);
                 }
                 return Row(children: [
-                  Expanded(
-                      flex: 3,
-                      child: Text(t['name'].toString(),
-                          style: const TextStyle(fontWeight: FontWeight.w600))),
+                  Expanded(flex: 3, child: numberedTitle),
                   const SizedBox(width: 16),
                   Expanded(child: quantityField),
                   const SizedBox(width: 12),
@@ -585,8 +645,25 @@ class _PortalState extends State<Portal> {
       }),
       if (tasks.any((t) => t['id'] == 'ledger_prepared')) ...[
         const SizedBox(height: 16),
-        const Text('Individual ledger preparation — EMR-wise',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${tasks.where((t) => t['id'] != 'ledger_prepared').length + 1}. ',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: TaskLogStyle.teal,
+              ),
+            ),
+            const Expanded(
+              child: Text(
+                'Individual ledger preparation — EMR-wise',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
         const Text(
             'One EMR per row; preparation quantity and hours are calculated automatically.'),
         ...List.generate(

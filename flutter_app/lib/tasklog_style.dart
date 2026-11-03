@@ -120,15 +120,47 @@ class TaskLogBrandMark extends StatelessWidget {
   const TaskLogBrandMark({super.key, this.size = 34});
   final double size;
   @override
-  Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: const Color(0xFF08101E),
-          border: Border.all(color: TaskLogStyle.border),
-          borderRadius: BorderRadius.circular(size * 0.25),
-        ),
+  Widget build(BuildContext context) {
+    final crossLength = size * 0.56;
+    final crossThickness = size * 0.18;
+    const crossColor = Color(0xFF081120);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: const Color(0xFF16C3B0),
+        borderRadius: BorderRadius.circular(size * 0.2),
+      ),
+      alignment: Alignment.center,
+      child: Stack(
         alignment: Alignment.center,
-        child: Icon(Icons.add_rounded, color: Colors.white, size: size * 0.76),
-      );
+        children: [
+          Container(
+            width: crossLength,
+            height: crossThickness,
+            decoration: BoxDecoration(
+              color: crossColor,
+              borderRadius: BorderRadius.circular(crossThickness * 0.16),
+            ),
+          ),
+          Container(
+            width: crossThickness,
+            height: crossLength,
+            decoration: BoxDecoration(
+              color: crossColor,
+              borderRadius: BorderRadius.circular(crossThickness * 0.16),
+            ),
+          ),
+          Opacity(
+            opacity: 0,
+            child: Icon(
+              Icons.add_rounded,
+              color: crossColor,
+              size: size * 0.72,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

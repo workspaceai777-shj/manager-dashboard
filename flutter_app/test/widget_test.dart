@@ -52,6 +52,19 @@ class FakeStaffApi extends StaffApi {
           'id': 'accounts_dha_attendance',
           'name': 'DHA Attendance Records Updated'
         },
+        {
+          'id': 'accounts_insurance_ledgers',
+          'name': 'Individual Insurance Ledgers Updated'
+        },
+        {'id': 'accounts_petty_cash', 'name': 'Petty Cash Filing Completed'},
+        {
+          'id': 'accounts_month_end',
+          'name': 'Month-End Collection Closing and Bank Deposit Handover'
+        },
+        {
+          'id': 'accounts_reception',
+          'name': 'Reception Duties and Reporting Vouchers'
+        },
       ];
     }
     if (branch == 'ONT-BB') {
@@ -347,15 +360,27 @@ void main() {
     await tester.tap(find.text('ONT-BB').first);
     await tester.pumpAndSettle();
 
-    // Verify ONT-BB FRONT DESK specific task appears
+    // Verify ONT-BB FRONT DESK specific task appears and is numbered
+    expect(find.text('1. '), findsOneWidget);
     expect(find.text('New patient registration and cards prepared'),
         findsOneWidget);
     // Staff navigation has Daily Tasks and My Dashboard only, never Settings
     expect(find.text('My Dashboard'), findsOneWidget);
     expect(find.text('Settings'), findsNothing);
 
-    // Switch to ONT-BR1 FRONT DESK and verify branch-specific task
+    // Switch to ONT-BR1 ACCOUNTS and verify numbering 1..7 and Yes/No for 2, 3, 5, 6, 7
     await tester.tap(find.text('ONT-BB — FRONT DESK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ONT-BR1 — ACCOUNTS').last);
+    await tester.pumpAndSettle();
+    for (int i = 1; i <= 7; i++) {
+      expect(find.text('$i. '), findsOneWidget);
+    }
+    expect(find.widgetWithText(InputDecorator, 'Yes / No'), findsNWidgets(5));
+    expect(find.widgetWithText(TextField, 'Quantity'), findsNWidgets(2));
+
+    // Switch to ONT-BR1 FRONT DESK and verify branch-specific task
+    await tester.tap(find.text('ONT-BR1 — ACCOUNTS'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('ONT-BR1 — FRONT DESK').last);
     await tester.pumpAndSettle();
