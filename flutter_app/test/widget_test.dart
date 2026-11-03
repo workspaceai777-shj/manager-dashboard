@@ -43,7 +43,6 @@ class FakeStaffApi extends StaffApi {
     }
     if (category == 'ACCOUNTS') {
       return const [
-        {'id': 'accounts_r4_ledgers', 'name': 'R4 Individual Ledgers Created'},
         {
           'id': 'accounts_collection_check',
           'name': 'Daily Collections Checked — White Fox and Ontario'
@@ -54,7 +53,7 @@ class FakeStaffApi extends StaffApi {
         },
         {
           'id': 'accounts_insurance_ledgers',
-          'name': 'Individual Insurance Ledgers Updated'
+          'name': 'Individual Ledgers for Insurance Updated & Showed'
         },
         {'id': 'accounts_petty_cash', 'name': 'Petty Cash Filing Completed'},
         {
@@ -353,12 +352,16 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // Branch selector screen appears first
+    // Branch selector screen appears first and shows logged-in staff name
     expect(find.text('Select branch and category'), findsOneWidget);
+    expect(find.text('Logged in as Prince'), findsOneWidget);
 
     // Select ONT-BB FRONT DESK
     await tester.tap(find.text('ONT-BB').first);
     await tester.pumpAndSettle();
+
+    // Verify logged-in staff name is visible in the top bar
+    expect(find.text('Prince'), findsOneWidget);
 
     // Verify ONT-BB FRONT DESK specific task appears and is numbered
     expect(find.text('1. '), findsOneWidget);
@@ -368,16 +371,20 @@ void main() {
     expect(find.text('My Dashboard'), findsOneWidget);
     expect(find.text('Settings'), findsNothing);
 
-    // Switch to ONT-BR1 ACCOUNTS and verify numbering 1..7 and Yes/No for 2, 3, 5, 6, 7
+    // Switch to ONT-BR1 ACCOUNTS and verify 6 activities (R4 Individual Ledgers Created removed,
+    // Individual Ledgers for Insurance Updated & Showed renamed)
     await tester.tap(find.text('ONT-BB — FRONT DESK'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('ONT-BR1 — ACCOUNTS').last);
     await tester.pumpAndSettle();
-    for (int i = 1; i <= 7; i++) {
+    expect(find.text('R4 Individual Ledgers Created'), findsNothing);
+    expect(find.text('Individual Ledgers for Insurance Updated & Showed'),
+        findsOneWidget);
+    for (int i = 1; i <= 6; i++) {
       expect(find.text('$i. '), findsOneWidget);
     }
     expect(find.widgetWithText(InputDecorator, 'Yes / No'), findsNWidgets(5));
-    expect(find.widgetWithText(TextField, 'Quantity'), findsNWidgets(2));
+    expect(find.widgetWithText(TextField, 'Quantity'), findsNWidgets(1));
 
     // Switch to ONT-BR1 FRONT DESK and verify branch-specific task
     await tester.tap(find.text('ONT-BR1 — ACCOUNTS'));

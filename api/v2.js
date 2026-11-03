@@ -63,10 +63,9 @@ const bbTasks=[
 const insurance=[['insurance_invoices','Insurance Invoices Prepared'],['insurance_documents','Insurance Documents Sent'],
 ['insurance_datewise','Insurance Datewise Updated'],['insurance_emrwise','Insurance EMRwise Updated']];
 const accounts=[
-  ['accounts_r4_ledgers','R4 Individual Ledgers Created'],
   ['accounts_collection_check','Daily Collections Checked — White Fox and Ontario'],
   ['accounts_dha_attendance','DHA Attendance Records Updated'],
-  ['accounts_insurance_ledgers','Individual Insurance Ledgers Updated'],
+  ['accounts_insurance_ledgers','Individual Ledgers for Insurance Updated & Showed'],
   ['accounts_petty_cash','Petty Cash Filing Completed'],
   ['accounts_month_end','Month-End Collection Closing and Bank Deposit Handover'],
   ['accounts_reception','Reception Duties and Reporting Vouchers']

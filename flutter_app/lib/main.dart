@@ -263,7 +263,15 @@ class _PortalState extends State<Portal> {
         'branch': nextBranch,
         'category': nextCategory,
       });
-      final nextTasks = List<dynamic>.from(response['tasks'] ?? []);
+      final nextTasks = List<dynamic>.from(response['tasks'] ?? [])
+          .where((t) => t['id'].toString() != 'accounts_r4_ledgers')
+          .map((t) {
+        final item = Map<String, dynamic>.from(t as Map);
+        if (item['id'] == 'accounts_insurance_ledgers') {
+          item['name'] = 'Individual Ledgers for Insurance Updated & Showed';
+        }
+        return item;
+      }).toList();
       // Fail closed if a stale or mismatched task catalog is received.
       // INSURANCE USER and ACCOUNTS have distinct task ID namespaces.
       if (nextCategory == 'INSURANCE USER' &&
@@ -345,6 +353,12 @@ class _PortalState extends State<Portal> {
   String _date(DateTime d) =>
       '${d.year.toString().padLeft(4, "0")}-${d.month.toString().padLeft(2, "0")}-${d.day.toString().padLeft(2, "0")}';
   bool get manager => profile['role'] == 'ADMIN';
+  String get staffDisplayName {
+    final name = (profile['name'] ?? '').toString().trim();
+    if (name.isNotEmpty) return name;
+    return (profile['email'] ?? '').toString().trim();
+  }
+
   void message(String s) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s)));
@@ -547,9 +561,7 @@ class _PortalState extends State<Portal> {
         final id = t['id'].toString();
         qty.putIfAbsent(id, () => TextEditingController());
         hours.putIfAbsent(id, () => TextEditingController());
-        final isYesNo = _yesNoTaskIds.contains(id) ||
-            (category == 'ACCOUNTS' &&
-                const {2, 3, 5, 6, 7}.contains(activityNumber));
+        final isYesNo = _yesNoTaskIds.contains(id);
         final yesNoValue =
             (double.tryParse(qty[id]?.text ?? '') ?? 0) >= 1 ? 'Yes' : 'No';
         return ConstrainedBox(
@@ -770,6 +782,18 @@ class _PortalState extends State<Portal> {
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
                     const Icon(Icons.business_outlined,
                         size: 40, color: TaskLogStyle.teal),
+                    if (staffDisplayName.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        'Logged in as $staffDisplayName',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: TaskLogStyle.teal,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     const Text('Select branch and category',
                         style: TextStyle(
@@ -883,6 +907,31 @@ class _PortalState extends State<Portal> {
                       overflow: TextOverflow.ellipsis))
             ]),
             actions: [
+              if (staffDisplayName.isNotEmpty)
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 110),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.person_outline,
+                            size: 16, color: TaskLogStyle.teal),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            staffDisplayName,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: TaskLogStyle.ink,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               IconButton(
                   onPressed: () => FirebaseAuth.instance.signOut(),
                   icon: const Icon(Icons.logout),
@@ -921,6 +970,41 @@ class _PortalState extends State<Portal> {
                     overflow: TextOverflow.ellipsis))
           ]),
           actions: [
+            if (staffDisplayName.isNotEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: TaskLogStyle.surface,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: TaskLogStyle.border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.person_outline,
+                            size: 16, color: TaskLogStyle.teal),
+                        const SizedBox(width: 6),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 180),
+                          child: Text(
+                            staffDisplayName,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: TaskLogStyle.ink,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             TextButton(
                 onPressed: () => FirebaseAuth.instance.signOut(),
                 child: const Text('Sign out')),
