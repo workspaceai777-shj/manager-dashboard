@@ -213,6 +213,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Ontario Staff Portal'), findsOneWidget);
       expect(find.byIcon(Icons.add_rounded), findsOneWidget);
+      expect(find.byType(AutofillGroup), findsOneWidget);
+      expect(find.text('Save login credentials'), findsOneWidget);
+      expect(
+        tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
+        isTrue,
+      );
+      await tester.tap(find.byType(CheckboxListTile));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
+        isFalse,
+      );
+      await tester.tap(find.byType(CheckboxListTile));
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     }
     await tester.binding.setSurfaceSize(null);

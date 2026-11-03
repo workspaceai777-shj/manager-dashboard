@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'api.dart';
@@ -38,12 +39,39 @@ class _LoginPageState extends State<LoginPage> {
   final email = TextEditingController(), password = TextEditingController();
   String error = '';
   bool busy = false;
+  bool saveCredentials = true;
 
   @override
   void dispose() {
     email.dispose();
     password.dispose();
     super.dispose();
+  }
+
+  Future<void> _signIn() async {
+    if (busy) return;
+    setState(() {
+      busy = true;
+      error = '';
+    });
+    try {
+      try {
+        await FirebaseAuth.instance.setPersistence(
+          saveCredentials ? Persistence.LOCAL : Persistence.SESSION,
+        );
+      } catch (_) {}
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email.text.trim(),
+        password: password.text,
+      );
+      TextInput.finishAutofillContext(shouldSave: saveCredentials);
+    } catch (e) {
+      setState(() =>
+          error = 'Sign-in failed. Check your credentials and account status.');
+    }
+    if (mounted) {
+      setState(() => busy = false);
+    }
   }
 
   @override
@@ -57,61 +85,69 @@ class _LoginPageState extends State<LoginPage> {
                       child: Card(
                           child: Padding(
                               padding: const EdgeInsets.all(24),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const TaskLogBrandMark(size: 54),
-                                  const SizedBox(height: 12),
-                                  const Text('Ontario Staff Portal',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 16),
-                                  TextField(
-                                      controller: email,
-                                      keyboardType: TextInputType.emailAddress,
-                                      decoration: const InputDecoration(
-                                          labelText: 'Email')),
-                                  const SizedBox(height: 12),
-                                  TextField(
-                                      controller: password,
-                                      obscureText: true,
-                                      decoration: const InputDecoration(
-                                          labelText: 'Password')),
-                                  if (error.isNotEmpty) ...[
+                              child: AutofillGroup(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const TaskLogBrandMark(size: 54),
                                     const SizedBox(height: 12),
-                                    Text(error,
+                                    const Text('Ontario Staff Portal',
                                         textAlign: TextAlign.center,
-                                        style:
-                                            const TextStyle(color: Colors.red)),
-                                  ],
-                                  const SizedBox(height: 18),
-                                  FilledButton(
-                                      onPressed: busy
+                                        style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 16),
+                                    TextField(
+                                        controller: email,
+                                        keyboardType:
+                                            TextInputType.emailAddress,
+                                        textInputAction: TextInputAction.next,
+                                        autofillHints: const [
+                                          AutofillHints.username,
+                                          AutofillHints.email,
+                                        ],
+                                        decoration: const InputDecoration(
+                                            labelText: 'Email')),
+                                    const SizedBox(height: 12),
+                                    TextField(
+                                        controller: password,
+                                        obscureText: true,
+                                        textInputAction: TextInputAction.done,
+                                        autofillHints: const [
+                                          AutofillHints.password,
+                                        ],
+                                        onSubmitted: (_) => _signIn(),
+                                        decoration: const InputDecoration(
+                                            labelText: 'Password')),
+                                    const SizedBox(height: 8),
+                                    CheckboxListTile(
+                                      value: saveCredentials,
+                                      dense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                      controlAffinity:
+                                          ListTileControlAffinity.leading,
+                                      title: const Text(
+                                        'Save login credentials',
+                                        style: TextStyle(fontSize: 14),
+                                      ),
+                                      onChanged: busy
                                           ? null
-                                          : () async {
-                                              setState(() {
-                                                busy = true;
-                                                error = '';
-                                              });
-                                              try {
-                                                await FirebaseAuth.instance
-                                                    .signInWithEmailAndPassword(
-                                                        email:
-                                                            email.text.trim(),
-                                                        password:
-                                                            password.text);
-                                              } catch (e) {
-                                                setState(() => error =
-                                                    'Sign-in failed. Check your credentials and account status.');
-                                              }
-                                              if (mounted) {
-                                                setState(() => busy = false);
-                                              }
-                                            },
-                                      child: const Text('Sign in'))
-                                ],
+                                          : (v) => setState(() =>
+                                              saveCredentials = v ?? true),
+                                    ),
+                                    if (error.isNotEmpty) ...[
+                                      const SizedBox(height: 12),
+                                      Text(error,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                              color: Colors.red)),
+                                    ],
+                                    const SizedBox(height: 12),
+                                    FilledButton(
+                                        onPressed: busy ? null : _signIn,
+                                        child: const Text('Sign in'))
+                                  ],
+                                ),
                               ))),
                     )))),
       );
