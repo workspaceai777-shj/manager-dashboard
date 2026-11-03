@@ -75,6 +75,24 @@ const activities=(branch,cat)=>{
   const x=cat==='ACCOUNTS'?accounts:cat==='INSURANCE USER'?insurance:branch==='ONT-BB'?bbTasks:[...baseReception,...brLedger,['collection','Daily Collection (AED)']];
   return x.map(([id,name])=>({id,name}));
 };
+// A replacement is append-only: older submissions remain available for audit,
+// while reads expose only rows after the latest replacement marker for each
+// employee / date / branch / category. No other employee's rows are overwritten.
+const REPLACE_MARKER = '__report_replace__';
+const reportKey = (e) => [e.uid,e.date,e.branch,e.category].join('\u001f');
+function activeEntries(records) {
+  const current = new Map();
+  for (const row of records) {
+    const key = reportKey(row);
+    if (row.taskId === REPLACE_MARKER) {
+      current.set(key, []);
+    } else {
+      if (!current.has(key)) current.set(key, []);
+      current.get(key).push(row);
+    }
+  }
+  return [...current.values()].flat();
+}
 function validDate(v) {return /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));}
 const result=(res,status,data)=>res.status(status).json(data);
 
@@ -108,7 +126,6 @@ export default async function handler(req,res){
     const me=users.find(u=>u.uid===uid && String(u.active).toLowerCase()==='true');
     if(!me)return result(res,403,{error:'No active staff account. Ask an administrator.'});
     const assignments=(await readTab(sheets,TAB_ASSIGN)).filter(a=>a.uid===uid && String(a.active).toLowerCase()==='true');
-    const manager=['ADMIN','MANAGER'].includes(me.role);
     const check=(branch,category)=> allowedBranches.includes(branch)&&allowedCategories.includes(category)&&(
       me.role==='ADMIN'||assignments.some(a=>a.branch===branch&&a.category===category));
     if(body.action==='bootstrap')return result(res,200,{profile:me,assignments:me.role==='ADMIN'?
@@ -117,7 +134,15 @@ export default async function handler(req,res){
       if(!check(body.branch,body.category))return result(res,403,{error:'Category not assigned'});
       return result(res,200,{tasks:activities(body.branch,body.category)});
     }
-    if(body.action==='save') {
+    if(body.action==='report'){
+      if(!check(body.branch,body.category))return result(res,403,{error:'Category not assigned'});
+      if(!validDate(body.date))return result(res,400,{error:'Invalid reporting date'});
+      const all=activeEntries(await readTab(sheets,TAB_ENTRIES));
+      const mine=all.filter(e=>e.uid===uid&&e.branch===body.branch&&
+        e.category===body.category&&e.date===body.date);
+      return result(res,200,{entries:mine});
+    }
+    if(body.action==='save'||body.action==='saveReport') {
       if(!check(body.branch,body.category))return result(res,403,{error:'Category not assigned'});
       if(!validDate(body.date)||!Array.isArray(body.entries)||body.entries.length>150)return result(res,400,{error:'Invalid date or entries'});
       const allowed=new Set(activities(body.branch,body.category).map(t=>t.id));
@@ -138,16 +163,33 @@ export default async function handler(req,res){
         } else if(emr) return result(res,400,{error:'EMR is only accepted for ledger preparation'});
         rows.push([crypto.randomUUID(),new Date().toISOString(),uid,me.name,body.date,body.branch,body.category,task,emr,remarks,quantity,hours]);
       }
-      if(!rows.length)return result(res,400,{error:'No tasks entered'});
-      await append(sheets,TAB_ENTRIES,rows);
+      if(body.action==='saveReport'){
+        // One append request commits the replacement marker and new records.
+        // An empty replacement is allowed only to clear a prior submission.
+        if(!rows.length){
+          const previous=activeEntries(await readTab(sheets,TAB_ENTRIES));
+          if(!previous.some(e=>e.uid===uid&&e.branch===body.branch&&
+            e.category===body.category&&e.date===body.date))
+            return result(res,400,{error:'No tasks entered'});
+        }
+        const marker=[crypto.randomUUID(),new Date().toISOString(),uid,me.name,
+          body.date,body.branch,body.category,REPLACE_MARKER,'','',0,0];
+        await append(sheets,TAB_ENTRIES,[marker,...rows]);
+      } else {
+        if(!rows.length)return result(res,400,{error:'No tasks entered'});
+        await append(sheets,TAB_ENTRIES,rows);
+      }
       return result(res,200,{saved:rows.length});
     }
-    if(body.action==='dashboard'){
-      if(!manager)return result(res,403,{error:'Manager access required'});
-      const all=await readTab(sheets,TAB_ENTRIES);
-      const from=validDate(body.from)?body.from:'0000-01-01',to=validDate(body.to)?body.to:'9999-12-31';
-      const permitted=me.role==='ADMIN'?null:new Set(assignments.map(a=>a.branch+'|'+a.category));
-      return result(res,200,{entries:all.filter(e=>e.date>=from&&e.date<=to && (!permitted||permitted.has(e.branch+'|'+e.category)))});
+    if(body.action==='dashboard'||body.action==='myDashboard'){
+      if(body.action==='dashboard'&&me.role!=='ADMIN')
+        return result(res,403,{error:'Administrator access required'});
+      const all=activeEntries(await readTab(sheets,TAB_ENTRIES));
+      const from=validDate(body.from)?body.from:'0000-01-01';
+      const to=validDate(body.to)?body.to:'9999-12-31';
+      const mine=body.action==='myDashboard';
+      return result(res,200,{entries:all.filter(e=>
+        e.date>=from&&e.date<=to&&(!mine||e.uid===uid))});
     }
     if(body.action==='users'){
       if(me.role!=='ADMIN')return result(res,403,{error:'Admin access required'});
