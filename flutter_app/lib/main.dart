@@ -164,6 +164,7 @@ class _PortalState extends State<Portal> {
         branch = nextBranch;
         category = nextCategory;
         tasks = nextTasks;
+        savedReportExists = false;
         branchSelected = true;
         page = 'Daily Tasks';
         error = '';
