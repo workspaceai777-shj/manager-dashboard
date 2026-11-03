@@ -75,6 +75,7 @@ class _PortalState extends State<Portal> {
   DateTime reportDate = DateTime.now();
   bool branchSelected = false;
   bool loading = true;
+  bool savedReportExists = false;
   final qty = <String, TextEditingController>{}, hours = <String, TextEditingController>{};
   final emr = <TextEditingController>[], remark = <TextEditingController>[], mins = <TextEditingController>[];
   final newUserEmail = TextEditingController(), newUserName = TextEditingController(), newUserUid = TextEditingController();
@@ -95,9 +96,13 @@ class _PortalState extends State<Portal> {
         category = '';
         tasks = [];
       }
-      if (profile['role'] == 'ADMIN' || profile['role'] == 'MANAGER') {
-        entries = List.from((await api.request('dashboard', body: {'from': _date(DateTime.now().subtract(const Duration(days:365))), 'to': _date(DateTime.now())}))['entries'] ?? []);
-      }
+      entries = List.from((await api.request(
+        profile['role'] == 'ADMIN' ? 'dashboard' : 'myDashboard',
+        body: {
+          'from': _date(DateTime.now().subtract(const Duration(days:365))),
+          'to': _date(DateTime.now()),
+        },
+      ))['entries'] ?? []);
       if (profile['role'] == 'ADMIN') users = List.from((await api.request('users'))['users'] ?? []);
       error = '';
     } catch (e) { error = e.toString(); }
@@ -163,6 +168,7 @@ class _PortalState extends State<Portal> {
         page = 'Daily Tasks';
         error = '';
       });
+      await restoreReport(nextBranch, nextCategory, reportDate);
     } catch (e) {
       message('Unable to load tasks: $e');
     } finally {
@@ -171,8 +177,75 @@ class _PortalState extends State<Portal> {
   }
 
   String _date(DateTime d) => '${d.year.toString().padLeft(4,"0")}-${d.month.toString().padLeft(2,"0")}-${d.day.toString().padLeft(2,"0")}';
-  bool get manager => profile['role'] == 'ADMIN' || profile['role'] == 'MANAGER';
+  bool get manager => profile['role'] == 'ADMIN';
   void message(String s) { if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s))); }
+
+  Future<void> restoreReport(String selectedBranch, String selectedCategory,
+      DateTime selectedDate) async {
+    final result = await api.request('report', body: {
+      'branch': selectedBranch,
+      'category': selectedCategory,
+      'date': _date(selectedDate),
+    });
+    if (!mounted) return;
+    for (final c in qty.values) {
+      c.clear();
+    }
+    for (final c in hours.values) {
+      c.clear();
+    }
+    emr.clear();
+    remark.clear();
+    mins.clear();
+    final previous = List<dynamic>.from(result['entries'] ?? []);
+    for (final raw in previous) {
+      final row = Map<String, dynamic>.from(raw as Map);
+      final id = row['taskId'].toString();
+      if (id == 'ledger_prepared') {
+        emr.add(TextEditingController(text: row['emr'].toString()));
+        remark.add(TextEditingController(text: row['remarks'].toString()));
+        final time = double.tryParse(row['hours'].toString()) ?? 0;
+        mins.add(TextEditingController(text: (time * 60).round().toString()));
+      } else {
+        qty.putIfAbsent(id, () => TextEditingController()).text = row['quantity'].toString();
+        hours.putIfAbsent(id, () => TextEditingController()).text = row['hours'].toString();
+      }
+    }
+    setState(() => savedReportExists = previous.isNotEmpty);
+  }
+
+  Future<void> selectReportDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: reportDate,
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2035),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      reportDate = picked;
+      loading = true;
+    });
+    try {
+      await restoreReport(branch, category, picked);
+    } catch (e) {
+      message('Unable to load saved report: $e');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> reloadSelectedReport() async {
+    setState(() => loading = true);
+    try {
+      await restoreReport(branch, category, reportDate);
+      message('Saved task entries loaded for ${_date(reportDate)}');
+    } catch (e) {
+      message('Unable to load saved report: $e');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
 
   Future<void> saveTasks() async {
     final data = <Map<String,dynamic>>[];
@@ -192,13 +265,13 @@ class _PortalState extends State<Portal> {
         }
       }
     }
-    if(data.isEmpty){message('Enter at least one task');return;}
+    if(data.isEmpty && !savedReportExists){message('Enter at least one task');return;}
     try {
-      await api.request('save',body:{'branch':branch,'category':category,'date':_date(reportDate),'entries':data});
-      for(final c in qty.values){c.clear();}
-      for(final c in hours.values){c.clear();}
-      emr.clear();remark.clear();mins.clear();setState((){});
-      message('Tasks saved');
+      await api.request('saveReport',body:{
+        'branch':branch,'category':category,'date':_date(reportDate),'entries':data
+      });
+      await restoreReport(branch, category, reportDate);
+      message('Daily report saved for ${_date(reportDate)}');
     } catch (e) {message(e.toString());}
   }
 
@@ -213,8 +286,13 @@ class _PortalState extends State<Portal> {
           final selection = v.split('|');
           await selectAssignment(selection[0], selection[1]);
         })),
-        OutlinedButton.icon(onPressed:() async {final x=await showDatePicker(context:context,initialDate:reportDate,firstDate:DateTime(2024),lastDate:DateTime(2035));if(x!=null)setState(()=>reportDate=x);}, icon:const Icon(Icons.calendar_month),label:Text(_date(reportDate))),
+        OutlinedButton.icon(onPressed:selectReportDate,
+          icon:const Icon(Icons.calendar_month),label:Text(_date(reportDate))),
+        OutlinedButton.icon(onPressed:reloadSelectedReport,
+          icon:const Icon(Icons.edit_calendar_outlined),
+          label:const Text('Load / edit saved report')),
       ]),
+      if (savedReportExists) const Padding(padding:EdgeInsets.only(top:10), child:Text('Saved report loaded — edit the values and save again to replace this date’s entries.',style:TextStyle(color:TaskLogStyle.teal))),
       const SizedBox(height:24), const Text('Daily task report',style:TextStyle(fontWeight:FontWeight.w800,fontSize:27,color:TaskLogStyle.ink)),
       const SizedBox(height:5),const Text('Record quantities and actual time spent on each activity',style:TextStyle(color:TaskLogStyle.muted)),
       const SizedBox(height:20), const Text('Activities',style:TextStyle(fontWeight:FontWeight.w700,fontSize:18)),
@@ -285,6 +363,7 @@ class _PortalState extends State<Portal> {
 
   Widget dashboard()=>PerformanceDashboard(
     records: entries,
+    isAdmin: manager,
     refresh: () async {setState(()=>loading=true);await load();},
   );
 
