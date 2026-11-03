@@ -86,11 +86,13 @@ class _PortalState extends State<Portal> {
       final b = Map<String, dynamic>.from(await api.request('bootstrap'));
       profile = Map<String,dynamic>.from(b['profile'] ?? {});
       assignments = List.from(b['assignments'] ?? []);
-      if (assignments.isNotEmpty) {
-        if (!assignments.any((x) => x['branch'] == branch && x['category'] == category)) {
-          branch = assignments.first['branch']; category = assignments.first['category'];
-        }
-        tasks = List.from((await api.request('tasks', body: {'branch': branch, 'category': category}))['tasks'] ?? []);
+      // A branch/category must be explicitly chosen by the staff member.
+      // Do not pre-load the first assignment: its asynchronous response can
+      // overwrite a different category selected on the login chooser.
+      if (!branchSelected) {
+        branch = '';
+        category = '';
+        tasks = [];
       }
       if (profile['role'] == 'ADMIN' || profile['role'] == 'MANAGER') {
         entries = List.from((await api.request('dashboard', body: {'from': _date(DateTime.now().subtract(const Duration(days:365))), 'to': _date(DateTime.now())}))['entries'] ?? []);
@@ -113,6 +115,24 @@ class _PortalState extends State<Portal> {
         'category': nextCategory,
       });
       final nextTasks = List<dynamic>.from(response['tasks'] ?? []);
+      // Fail closed if a stale or mismatched task catalog is received.
+      // INSURANCE USER and ACCOUNTS have distinct task ID namespaces.
+      if (nextCategory == 'INSURANCE USER' &&
+          (nextTasks.isEmpty ||
+           nextTasks.any((t) => !t['id'].toString().startsWith('insurance_')))) {
+        throw StateError('Incorrect Insurance task list returned. Please retry.');
+      }
+      if (nextCategory == 'ACCOUNTS' &&
+          (nextTasks.isEmpty ||
+           nextTasks.any((t) => !t['id'].toString().startsWith('accounts_')))) {
+        throw StateError('Incorrect Accounts task list returned. Please retry.');
+      }
+      if (nextCategory == 'FRONT DESK' &&
+          nextTasks.any((t) =>
+              t['id'].toString().startsWith('insurance_') ||
+              t['id'].toString().startsWith('accounts_'))) {
+        throw StateError('Incorrect Front Desk task list returned. Please retry.');
+      }
       if (!mounted) return;
       for (final controller in qty.values) {
         controller.dispose();
@@ -202,7 +222,7 @@ class _PortalState extends State<Portal> {
         final id=t['id'].toString();
         qty.putIfAbsent(id,()=>TextEditingController());
         hours.putIfAbsent(id,()=>TextEditingController());
-        return ConstrainedBox(constraints:const BoxConstraints(maxWidth:940),child:Card(child:Padding(padding:const EdgeInsets.all(16),child:Wrap(
+        return ConstrainedBox(key:ValueKey('$branch|$category|$id'),constraints:const BoxConstraints(maxWidth:940),child:Card(child:Padding(padding:const EdgeInsets.all(16),child:Wrap(
           crossAxisAlignment:WrapCrossAlignment.center,spacing:12,runSpacing:8,children:[
             SizedBox(width:360,child:Text(t['name'],style:const TextStyle(fontWeight:FontWeight.w500))),
             SizedBox(width:115,child:TextField(controller:qty[id],keyboardType:TextInputType.number,decoration:InputDecoration(labelText:id=='collection'?'AED':'Quantity',isDense:true,border:const OutlineInputBorder()))),
