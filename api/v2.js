@@ -205,7 +205,7 @@ export default async function handler(req,res){
       const role=String(body.role||'STAFF');
       const selected=Array.isArray(body.assignments)?body.assignments:[];
       if(!email.includes('@')||name.length<2||name.length>120||password.length<12||
-        !['STAFF','MANAGER','ADMIN'].includes(role)||selected.length<1||selected.length>4||
+        !['STAFF','MANAGER','ADMIN'].includes(role)||selected.length<1||selected.length>allowedBranches.length*allowedCategories.length||
         selected.some(a=>!allowedBranches.includes(a.branch)||!allowedCategories.includes(a.category))||
         new Set(selected.map(a=>a.branch+'|'+a.category)).size!==selected.length)
         return result(res,400,{error:'Invalid user details, password, or assignments'});
@@ -224,7 +224,7 @@ export default async function handler(req,res){
       if(me.role!=='ADMIN')return result(res,403,{error:'Admin access required'});
       const target=String(body.uid||'');
       const selected=Array.isArray(body.assignments)?body.assignments:[];
-      if(!target||selected.length>4||selected.some(a=>!allowedBranches.includes(a.branch)||
+      if(!target||selected.length>allowedBranches.length*allowedCategories.length||selected.some(a=>!allowedBranches.includes(a.branch)||
         !allowedCategories.includes(a.category))||
         new Set(selected.map(a=>a.branch+'|'+a.category)).size!==selected.length)
         return result(res,400,{error:'Invalid assignments'});
