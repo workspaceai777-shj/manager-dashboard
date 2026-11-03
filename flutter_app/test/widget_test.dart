@@ -488,6 +488,7 @@ void main() {
       await tester.tap(find.byIcon(Icons.settings));
       await tester.pumpAndSettle();
       expect(find.text('Staff management'), findsOneWidget);
+      expect(find.text("DOCTOR'S ZONE"), findsNWidgets(2));
       expect(tester.takeException(), isNull);
     }
     tester.view.resetPhysicalSize();

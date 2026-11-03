@@ -29,8 +29,25 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
 
   double num(dynamic x) => double.tryParse(x.toString()) ?? 0;
 
-  List<String> options(String key) =>
-      <String>{'ALL', ...widget.records.map((e) => e[key].toString())}.toList();
+  List<String> options(String key) {
+    final defaults = key == 'branch'
+        ? const ['ONT-BB', 'ONT-BR1']
+        : key == 'category'
+            ? const [
+                'FRONT DESK',
+                'INSURANCE USER',
+                'ACCOUNTS',
+                "DOCTOR'S ZONE",
+              ]
+            : const <String>[];
+    return <String>{
+      'ALL',
+      ...defaults,
+      ...widget.records
+          .map((e) => (e[key] ?? '').toString().trim())
+          .where((v) => v.isNotEmpty),
+    }.toList();
+  }
 
   List<dynamic> get rows => widget.records.where((e) {
         if (branch != 'ALL' && e['branch'] != branch) {
