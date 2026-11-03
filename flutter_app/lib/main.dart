@@ -465,8 +465,12 @@ class _PortalState extends State<Portal> {
     final data = <Map<String, dynamic>>[];
     for (final task in tasks) {
       final id = task['id'].toString();
-      final q = double.tryParse(qty[id]?.text ?? '') ?? 0;
-      final h = double.tryParse(hours[id]?.text ?? '') ?? 0;
+      final qText = (qty[id]?.text ?? '').trim();
+      final hText = (hours[id]?.text ?? '').trim();
+      final parsedQ = qText.isEmpty ? 0.0 : (double.tryParse(qText) ?? 0.0);
+      final parsedH = hText.isEmpty ? 0.0 : (double.tryParse(hText) ?? 0.0);
+      final q = parsedQ < 0 ? 0.0 : parsedQ;
+      final h = parsedH < 0 ? 0.0 : parsedH;
       if (q > 0 || h > 0) {
         data.add({
           'taskId': id,
@@ -479,21 +483,19 @@ class _PortalState extends State<Portal> {
         tasks.where((t) => t['id'] == 'ledger_prepared').toList();
     if (ledgerTask.isNotEmpty) {
       for (int i = 0; i < emr.length; i++) {
-        final m = int.tryParse(mins[i].text) ?? 0;
-        if (emr[i].text.trim().isNotEmpty && m > 0) {
+        final mText = mins[i].text.trim();
+        final parsedM = mText.isEmpty ? 0 : (int.tryParse(mText) ?? 0);
+        final m = parsedM < 0 ? 0 : parsedM;
+        if (emr[i].text.trim().isNotEmpty) {
           data.add({
             'taskId': 'ledger_prepared',
             'emr': emr[i].text.trim(),
             'remarks': remark[i].text.trim(),
             'quantity': 1,
-            'hours': m / 60
+            'hours': m > 0 ? m / 60 : 0
           });
         }
       }
-    }
-    if (data.isEmpty && !savedReportExists) {
-      message('Enter at least one task');
-      return;
     }
     try {
       await api.request('saveReport', body: {

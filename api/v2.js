@@ -162,34 +162,30 @@ export default async function handler(req,res){
       const seenLedger=new Set();
       for(const e of body.entries){
         const task=String(e.taskId??'');
-        const quantity=Number(e.quantity),hours=Number(e.hours);
-        if(!allowed.has(task)||!Number.isFinite(quantity)||!Number.isFinite(hours)||quantity<0||hours<0||hours>24||quantity>100000)
+        const rawQty=(e.quantity===''||e.quantity===null||e.quantity===undefined)?0:Number(e.quantity);
+        const rawHours=(e.hours===''||e.hours===null||e.hours===undefined)?0:Number(e.hours);
+        const quantity=Number.isFinite(rawQty)?rawQty:NaN;
+        const hours=Number.isFinite(rawHours)?rawHours:NaN;
+        if(!allowed.has(task)||!Number.isFinite(quantity)||!Number.isFinite(hours)||quantity<0||hours<0||hours>100000||quantity>100000)
           return result(res,400,{error:'Invalid task quantity or hours'});
-        if(task!=='collection'&&!Number.isInteger(quantity))return result(res,400,{error:'Quantities must be whole numbers'});
+        if(quantity===0&&hours===0&&task!=='ledger_prepared')continue;
+        const normalizedQuantity=task==='collection'?quantity:Math.round(quantity);
         const emr=String(e.emr??'').trim(),remarks=String(e.remarks??'').trim();
         if(emr.length>70||remarks.length>500)return result(res,400,{error:'EMR or remarks too long'});
         if(task==='ledger_prepared'){
-          if(!emr||quantity!==1||hours<=0)return result(res,400,{error:'Each prepared ledger needs an EMR and positive time'});
+          if(!emr)continue;
           if(seenLedger.has(emr))return result(res,400,{error:'Duplicate EMR in submission'});
           seenLedger.add(emr);
         } else if(emr) return result(res,400,{error:'EMR is only accepted for ledger preparation'});
-        rows.push([crypto.randomUUID(),new Date().toISOString(),uid,me.name,body.date,body.branch,body.category,task,emr,remarks,quantity,hours]);
+        rows.push([crypto.randomUUID(),new Date().toISOString(),uid,me.name,body.date,body.branch,body.category,task,emr,remarks,normalizedQuantity,hours]);
       }
       if(body.action==='saveReport'){
         // One append request commits the replacement marker and new records.
-        // An empty replacement is allowed only to clear a prior submission.
-        if(!rows.length){
-          const previous=activeEntries(await readTab(sheets,TAB_ENTRIES));
-          if(!previous.some(e=>e.uid===uid&&e.branch===body.branch&&
-            e.category===body.category&&e.date===body.date))
-            return result(res,400,{error:'No tasks entered'});
-        }
         const marker=[crypto.randomUUID(),new Date().toISOString(),uid,me.name,
           body.date,body.branch,body.category,REPLACE_MARKER,'','',0,0];
         await append(sheets,TAB_ENTRIES,[marker,...rows]);
       } else {
-        if(!rows.length)return result(res,400,{error:'No tasks entered'});
-        await append(sheets,TAB_ENTRIES,rows);
+        if(rows.length)await append(sheets,TAB_ENTRIES,rows);
       }
       return result(res,200,{saved:rows.length});
     }
