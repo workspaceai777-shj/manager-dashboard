@@ -33,19 +33,19 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
       items:opts.map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),
       onChanged:change));
   Widget tile(String title,String val,IconData icon,Color color)=>
-    Container(width:220,padding:const EdgeInsets.all(22),
-      decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(18),
-        border:Border.all(color:const Color(0xFFE5EAF2))),
+    Container(width:MediaQuery.sizeOf(context).width<620 ? (MediaQuery.sizeOf(context).width-48)/2 : 220,padding:const EdgeInsets.all(16),
+      decoration:BoxDecoration(gradient:const LinearGradient(colors:[Color(0xFF20334F),Color(0xFF132138)]),borderRadius:BorderRadius.circular(20),
+        border:Border.all(color:TaskLogStyle.border)),
       child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         CircleAvatar(backgroundColor:color.withValues(alpha:0.1),child:Icon(icon,color:color)),
         const SizedBox(height:16),
-        Text(val,style:const TextStyle(fontSize:29,fontWeight:FontWeight.w800,color:TaskLogStyle.ink)),
-        Text(title,style:const TextStyle(color:TaskLogStyle.muted)),
+        Text(val,style:const TextStyle(fontSize:25,fontWeight:FontWeight.w800,color:TaskLogStyle.ink)),
+        Text(title,maxLines:2,style:const TextStyle(fontSize:12,color:TaskLogStyle.muted)),
       ]));
   Widget panel(String title,Widget child)=>Container(
     padding:const EdgeInsets.all(22),
-    decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(18),
-      border:Border.all(color:const Color(0xFFE5EAF2))),
+    decoration:BoxDecoration(gradient:const LinearGradient(colors:[Color(0xFF20334F),Color(0xFF132138)]),borderRadius:BorderRadius.circular(20),
+      border:Border.all(color:TaskLogStyle.border)),
     child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       Text(title,style:const TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
       const SizedBox(height:16),child,
@@ -67,7 +67,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
       ..sort((a,b)=>b.value.compareTo(a.value));
     final totalHours=hours.values.fold(0.0,(a,b)=>a+b);
     final max=quantityTasks.isEmpty?1.0:quantityTasks.first.value+1;
-    const chartColors=[Color(0xFF0E9488),Color(0xFF397DCE),Color(0xFF8D66D5),
+    const chartColors=[Color(0xFF34D5C0),Color(0xFF579FE8),Color(0xFFB18AF1),
       Color(0xFFE6A34C),Color(0xFFE67988),Color(0xFF52B9AA)];
     final chart1=panel('Task quantities',SizedBox(height:340,child:quantityTasks.isEmpty
       ?const Center(child:Text('No records for selected filters'))
@@ -102,7 +102,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
           ))),
         barGroups:quantityTasks.take(9).toList().asMap().entries.map((e)=>
           BarChartGroupData(x:e.key,barRods:[BarChartRodData(toY:e.value.value,
-            color:TaskLogStyle.teal,width:24,
+            color:TaskLogStyle.teal,width:18,
             borderRadius:const BorderRadius.vertical(top:Radius.circular(7)))] )).toList(),
       ))));
     final chart2=panel('Time spent by activity',SizedBox(height:280,child:hourTasks.isEmpty
@@ -112,7 +112,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
           hourTasks.take(6).toList().asMap().entries.map((e)=>
             PieChartSectionData(value:e.value.value,color:chartColors[e.key%6],
               radius:44,showTitle:false)).toList()))),
-        SizedBox(width:160,child:Column(mainAxisAlignment:MainAxisAlignment.center,
+        SizedBox(width:MediaQuery.sizeOf(context).width<620?110:160,child:Column(mainAxisAlignment:MainAxisAlignment.center,
           crossAxisAlignment:CrossAxisAlignment.start,children:[
           Text('${totalHours.toStringAsFixed(2)} hours',
             style:const TextStyle(fontWeight:FontWeight.w700,fontSize:18)),
@@ -124,7 +124,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
       ])));
     return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       Row(children:[const Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Text('Performance dashboard',style:TextStyle(fontSize:30,fontWeight:FontWeight.w800,color:TaskLogStyle.ink)),
+        Text('Performance dashboard',style:TextStyle(fontSize:26,fontWeight:FontWeight.w800,color:TaskLogStyle.ink)),
         SizedBox(height:5),
         Text('A clear view of daily activity, hours and ledger work',
           style:TextStyle(color:TaskLogStyle.muted)),
@@ -145,7 +145,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
         TextButton(onPressed:()=>setState((){todayOnly=false;period=null;}),child:const Text('All loaded dates')),
       ]),
       const SizedBox(height:24),
-      Wrap(spacing:14,runSpacing:14,children:[
+      Wrap(spacing:10,runSpacing:10,children:[
         tile('Ledgers prepared',(totals['ledger_prepared']??0).toStringAsFixed(0),
           Icons.menu_book_outlined,chartColors[1]),
         tile('Ledgers updated',(totals['ledger_updated']??0).toStringAsFixed(0),
