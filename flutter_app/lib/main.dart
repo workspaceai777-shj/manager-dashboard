@@ -167,6 +167,8 @@ class _PortalState extends State<Portal> {
     'accounts_petty_cash',
     'accounts_month_end',
     'accounts_reception',
+    'room_chore_inspection',
+    'daily_collection_billing_done',
   };
 
   late final StaffApi api = widget.api ?? StaffApi();
@@ -182,10 +184,22 @@ class _PortalState extends State<Portal> {
   final emr = <TextEditingController>[],
       remark = <TextEditingController>[],
       mins = <TextEditingController>[];
+  final otherTaskDesc = TextEditingController(),
+      otherTaskMins = TextEditingController();
   final newUserEmail = TextEditingController(),
       newUserName = TextEditingController(),
       newUserUid = TextEditingController();
   String newUserBranch = 'ONT-BB', newUserCategory = 'FRONT DESK';
+
+  String? get emrTaskId {
+    if (tasks.any((t) => t['id'] == 'ledger_prepared')) {
+      return 'ledger_prepared';
+    }
+    if (tasks.any((t) => t['id'] == 'insurance_ledger_emr')) {
+      return 'insurance_ledger_emr';
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -210,6 +224,8 @@ class _PortalState extends State<Portal> {
     for (final c in mins) {
       c.dispose();
     }
+    otherTaskDesc.dispose();
+    otherTaskMins.dispose();
     newUserEmail.dispose();
     newUserName.dispose();
     newUserUid.dispose();
@@ -282,6 +298,16 @@ class _PortalState extends State<Portal> {
           ...nextTasks,
         ];
       }
+      if (nextCategory == 'INSURANCE USER' &&
+          !nextTasks.any((t) => t['id'] == 'insurance_ledger_emr')) {
+        nextTasks = [
+          ...nextTasks,
+          {
+            'id': 'insurance_ledger_emr',
+            'name': 'Insurance EMR-wise Entry',
+          },
+        ];
+      }
       // Fail closed if a stale or mismatched task catalog is received.
       // INSURANCE USER and ACCOUNTS have distinct task ID namespaces.
       if (nextCategory == 'INSURANCE USER' &&
@@ -334,6 +360,8 @@ class _PortalState extends State<Portal> {
       emr.clear();
       remark.clear();
       mins.clear();
+      otherTaskDesc.clear();
+      otherTaskMins.clear();
       setState(() {
         branch = nextBranch;
         category = nextCategory;
@@ -409,15 +437,21 @@ class _PortalState extends State<Portal> {
     emr.clear();
     remark.clear();
     mins.clear();
+    otherTaskDesc.clear();
+    otherTaskMins.clear();
     final previous = List<dynamic>.from(result['entries'] ?? []);
     for (final raw in previous) {
       final row = Map<String, dynamic>.from(raw as Map);
       final id = row['taskId'].toString();
-      if (id == 'ledger_prepared') {
+      if (id == 'ledger_prepared' || id == 'insurance_ledger_emr') {
         emr.add(TextEditingController(text: row['emr'].toString()));
         remark.add(TextEditingController(text: row['remarks'].toString()));
         final time = double.tryParse(row['hours'].toString()) ?? 0;
         mins.add(TextEditingController(text: (time * 60).round().toString()));
+      } else if (id == 'other_tasks') {
+        otherTaskDesc.text = row['remarks'].toString();
+        final time = double.tryParse(row['hours'].toString()) ?? 0;
+        otherTaskMins.text = (time * 60).round().toString();
       } else {
         qty.putIfAbsent(id, () => TextEditingController()).text =
             row['quantity'].toString();
@@ -480,16 +514,15 @@ class _PortalState extends State<Portal> {
         });
       }
     }
-    final ledgerTask =
-        tasks.where((t) => t['id'] == 'ledger_prepared').toList();
-    if (ledgerTask.isNotEmpty) {
+    final activeEmrTask = emrTaskId;
+    if (activeEmrTask != null) {
       for (int i = 0; i < emr.length; i++) {
         final mText = mins[i].text.trim();
         final parsedM = mText.isEmpty ? 0 : (int.tryParse(mText) ?? 0);
         final m = parsedM < 0 ? 0 : parsedM;
         if (emr[i].text.trim().isNotEmpty) {
           data.add({
-            'taskId': 'ledger_prepared',
+            'taskId': activeEmrTask,
             'emr': emr[i].text.trim(),
             'remarks': remark[i].text.trim(),
             'quantity': 1,
@@ -497,6 +530,20 @@ class _PortalState extends State<Portal> {
           });
         }
       }
+    }
+    final otherDesc = otherTaskDesc.text.trim();
+    final otherMText = otherTaskMins.text.trim();
+    final parsedOtherM =
+        otherMText.isEmpty ? 0.0 : (double.tryParse(otherMText) ?? 0.0);
+    final otherM = parsedOtherM < 0 ? 0.0 : parsedOtherM;
+    if (otherDesc.isNotEmpty || otherM > 0) {
+      data.add({
+        'taskId': 'other_tasks',
+        'emr': '',
+        'remarks': otherDesc,
+        'quantity': 1,
+        'hours': otherM / 60.0,
+      });
     }
     try {
       await api.request('saveReport', body: {
@@ -572,7 +619,10 @@ class _PortalState extends State<Portal> {
           style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
       const SizedBox(height: 8),
       ...tasks
-          .where((t) => t['id'] != 'ledger_prepared')
+          .where((t) =>
+              t['id'] != 'ledger_prepared' &&
+              t['id'] != 'insurance_ledger_emr' &&
+              t['id'] != 'other_tasks')
           .toList()
           .asMap()
           .entries
@@ -676,29 +726,32 @@ class _PortalState extends State<Portal> {
           ),
         );
       }),
-      if (tasks.any((t) => t['id'] == 'ledger_prepared')) ...[
+      if (emrTaskId != null) ...[
         const SizedBox(height: 16),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${tasks.where((t) => t['id'] != 'ledger_prepared').length + 1}. ',
+              '${tasks.where((t) => t['id'] != 'ledger_prepared' && t['id'] != 'insurance_ledger_emr' && t['id'] != 'other_tasks').length + 1}. ',
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
                 color: TaskLogStyle.teal,
               ),
             ),
-            const Expanded(
+            Expanded(
               child: Text(
-                'Individual ledger preparation — EMR-wise',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                emrTaskId == 'insurance_ledger_emr'
+                    ? 'Insurance EMR-wise — EMR number and time taken'
+                    : 'Individual ledger preparation — EMR-wise',
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
             ),
           ],
         ),
         const Text(
-            'One EMR per row; preparation quantity and hours are calculated automatically.'),
+            'One EMR per row; preparation quantity and time are calculated automatically.'),
         ...List.generate(
             emr.length,
             (i) => Card(
@@ -774,6 +827,62 @@ class _PortalState extends State<Portal> {
             icon: const Icon(Icons.add),
             label: const Text('Add EMR')),
       ],
+      const SizedBox(height: 20),
+      const Text(
+        'Other task carried out',
+        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+      ),
+      const SizedBox(height: 4),
+      const Text(
+        'Enter any other tasks not included in the list above and the time taken.',
+        style: TextStyle(color: TaskLogStyle.muted, fontSize: 13),
+      ),
+      const SizedBox(height: 8),
+      ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 940),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: LayoutBuilder(builder: (context, constraints) {
+              final compact = constraints.maxWidth < 650;
+              final descField = TextField(
+                controller: otherTaskDesc,
+                minLines: 1,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Other task carried out',
+                ),
+              );
+              final minsField = TextField(
+                controller: otherTaskMins,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Minutes',
+                ),
+              );
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    descField,
+                    const SizedBox(height: 12),
+                    minsField,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 3, child: descField),
+                  const SizedBox(width: 16),
+                  Expanded(child: minsField),
+                ],
+              );
+            }),
+          ),
+        ),
+      ),
       const SizedBox(height: 20),
       FilledButton.icon(
           onPressed: saveTasks,

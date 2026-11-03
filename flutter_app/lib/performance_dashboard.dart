@@ -185,6 +185,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
     final totals = <String, double>{},
         hours = <String, double>{},
         byEmployee = <String, double>{};
+    final otherRemarks = <String>{};
     for (final e in rows) {
       final task = e['taskId'].toString();
       final name = e['employeeName'].toString();
@@ -193,6 +194,17 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
       if (task != 'collection') {
         byEmployee[name] = (byEmployee[name] ?? 0) + num(e['quantity']);
       }
+      if (task == 'other_tasks') {
+        final r = (e['remarks'] ?? '').toString().trim();
+        if (r.isNotEmpty) otherRemarks.add(r);
+      }
+    }
+    String formatTaskLabel(String key) {
+      final base = key.replaceAll('_', ' ');
+      if (key == 'other_tasks' && otherRemarks.isNotEmpty) {
+        return '$base (${otherRemarks.join('; ')})';
+      }
+      return base;
     }
     final quantityTasks = totals.entries
         .where((e) => e.key != 'collection')
@@ -386,7 +398,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                         children: [
                           Expanded(
                             child: Text(
-                              e.key.replaceAll('_', ' '),
+                              formatTaskLabel(e.key),
                               style: const TextStyle(
                                 fontSize: 12.5,
                                 color: TaskLogStyle.ink,
@@ -468,7 +480,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                           ),
                           Expanded(
                             child: Text(
-                              e.key.replaceAll('_', ' '),
+                              formatTaskLabel(e.key),
                               style: const TextStyle(
                                 fontSize: 12.5,
                                 color: TaskLogStyle.ink,

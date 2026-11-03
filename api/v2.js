@@ -49,24 +49,44 @@ const baseReception=[
 ['confirmations','Confirmation Messages Sent'],['consultations','Consultations Coordinated'],
 ['enquiries','Enquiries Handled'],['registration_excel','Patient Registration Excel updated']
 ];
-const brLedger=[['ledger_prepared','Individual Ledgers Prepared (EMR-wise)'],['ledger_updated','Ledgers Updated (R4)'],
-['patient_cards','Patient Cards Prepared'],['charts','Charts Prepared'],['patient_documents','Patient Documents Updated'],
-['emr_updated','EMR Records Updated'],['appointment_excel','Appointment Excel Records Updated'],
-['due_checked','Next Day Appointment Due Checked']];
+const brLedger=[
+  ['ledger_prepared','Individual Ledgers Prepared (EMR-wise)'],
+  ['ledger_updated','Ledgers Updated (R4)'],
+  ['patient_cards','Treatment Charts & Reporting Vouchers prepared'],
+  ['charts','Charts prepared for next day including session & rearranged all cards.'],
+  ['patient_documents','Patient Documents Updated'],
+  ['emr_updated','EMR Records Updated'],
+  ['appointment_excel','Appointment Excel Records Updated'],
+  ['due_checked','Next Day Appointment Due Checked'],
+  ['room_chore_inspection','Room Chore Inspection'],
+  ['daily_collection_billing_done','Daily Collection in Excel & Billing in software Done'],
+  ['daily_task_updation','Daily Task Updation']
+];
 const bbTasks=[
-['registrations','New patient registration and cards prepared'],['whatsapp','WhatsApp messages checked and responded'],
-['therapist_schedule','Therapist schedule arranged and posted'],['reminders','Next-day WhatsApp reminders sent'],
-['billing_excel','Billing and daily collection Excel prepared'],['registration_excel','New registration Excel updated'],
-['appointments','Appointments, arrival and reporting vouchers'],['collection','Daily collection (AED)'],
-['card_details','Card date/time, therapist and treatment entered'],['ledger_updated','Next-day individual ledgers updated'],
-['cards_arranged','Next-day cards arranged'],['ledger_prepared','Individual Ledgers Prepared (EMR-wise)']
+  ['registrations','New patient registration and cards prepared'],
+  ['whatsapp','WhatsApp messages checked and responded'],
+  ['therapist_schedule','Therapist schedule arranged and posted'],
+  ['reminders','Next-day WhatsApp reminders sent'],
+  ['billing_excel','Billing and daily collection Excel prepared'],
+  ['registration_excel','New registration Excel updated'],
+  ['appointments','Appointments, arrival and reporting vouchers'],
+  ['collection','Daily collection (AED)'],
+  ['card_details','Card date/time, therapist and treatment entered'],
+  ['patient_cards','Treatment Charts & Reporting Vouchers prepared'],
+  ['charts','Charts prepared for next day including session & rearranged all cards.'],
+  ['ledger_updated','Next-day individual ledgers updated'],
+  ['room_chore_inspection','Room Chore Inspection'],
+  ['daily_collection_billing_done','Daily Collection in Excel & Billing in software Done'],
+  ['daily_task_updation','Daily Task Updation'],
+  ['ledger_prepared','Individual Ledgers Prepared (EMR-wise)']
 ];
 const insurance=[
   ['insurance_claims_prepared','Insurance Claims Prepared'],
   ['insurance_invoices','Insurance Invoices Prepared'],
   ['insurance_documents','Insurance Documents Sent'],
   ['insurance_datewise','Insurance Datewise Updated'],
-  ['insurance_emrwise','Insurance EMRwise Updated']
+  ['insurance_emrwise','Insurance EMRwise Updated'],
+  ['insurance_ledger_emr','Insurance EMR-wise Entry']
 ];
 const accounts=[
   ['accounts_collection_check','Daily Collections Checked — White Fox and Ontario'],
@@ -74,7 +94,22 @@ const accounts=[
   ['accounts_insurance_ledgers','Individual Ledgers for Insurance Updated & Showed'],
   ['accounts_petty_cash','Petty Cash Filing Completed'],
   ['accounts_month_end','Month-End Collection Closing and Bank Deposit Handover'],
-  ['accounts_reception','Reception Duties and Reporting Vouchers']
+  ['accounts_reception','Reception Duties and Reporting Vouchers'],
+  ['accounts_zoho_updation','Zoho updation'],
+  ['accounts_vat_excel_ontario','Vat excel entry Ontario'],
+  ['accounts_vat_filing_ontario','Vat filing Ontario'],
+  ['accounts_vat_excel_whitefox','Vat excel updation White fox'],
+  ['accounts_vat_filing_whitefox','Vat filing White fox'],
+  ['accounts_cash_in_hand_checking','Cash in hand checking'],
+  ['accounts_staff_attendance','Staff attendance Ontario and Whitefox'],
+  ['accounts_towel_import_invoice','Towel import invoice preparation, cash collect from customer and excel update'],
+  ['accounts_medicine_collect_whitefox','Medicine collect from supplier for whitefox and invoice updated'],
+  ['accounts_month_end_closing_deposit','Month end closing and cash handover for deposit'],
+  ['accounts_whitefox_consignment_sale','White fox Consignment basis sale checking and update'],
+  ['accounts_petty_cash_voucher_entry','Petty cash voucher entry and filing'],
+  ['accounts_petty_cash_excel','Petty cash excel'],
+  ['accounts_monthly_collection_excel','Monthly collection excel'],
+  ['accounts_purchase_request_month','Purchase request for one month']
 ];
 const doctorsZone=[
   ['doctors_consultations','Number of Consultations'],
@@ -158,6 +193,8 @@ export default async function handler(req,res){
       if(!check(body.branch,body.category))return result(res,403,{error:'Category not assigned'});
       if(!validDate(body.date)||!Array.isArray(body.entries)||body.entries.length>150)return result(res,400,{error:'Invalid date or entries'});
       const allowed=new Set(activities(body.branch,body.category).map(t=>t.id));
+      allowed.add('other_tasks');
+      allowed.add('cards_arranged');
       const rows=[];
       const seenLedger=new Set();
       for(const e of body.entries){
@@ -168,15 +205,16 @@ export default async function handler(req,res){
         const hours=Number.isFinite(rawHours)?rawHours:NaN;
         if(!allowed.has(task)||!Number.isFinite(quantity)||!Number.isFinite(hours)||quantity<0||hours<0||hours>100000||quantity>100000)
           return result(res,400,{error:'Invalid task quantity or hours'});
-        if(quantity===0&&hours===0&&task!=='ledger_prepared')continue;
-        const normalizedQuantity=task==='collection'?quantity:Math.round(quantity);
         const emr=String(e.emr??'').trim(),remarks=String(e.remarks??'').trim();
-        if(emr.length>70||remarks.length>500)return result(res,400,{error:'EMR or remarks too long'});
-        if(task==='ledger_prepared'){
+        if(quantity===0&&hours===0&&task!=='ledger_prepared'&&task!=='insurance_ledger_emr'&&!(task==='other_tasks'&&remarks))continue;
+        const normalizedQuantity=task==='collection'?quantity:Math.round(quantity);
+        if(emr.length>70||remarks.length>1000)return result(res,400,{error:'EMR or remarks too long'});
+        if(task==='ledger_prepared'||task==='insurance_ledger_emr'){
           if(!emr)continue;
-          if(seenLedger.has(emr))return result(res,400,{error:'Duplicate EMR in submission'});
-          seenLedger.add(emr);
-        } else if(emr) return result(res,400,{error:'EMR is only accepted for ledger preparation'});
+          const ledgerKey=`${task}:${emr}`;
+          if(seenLedger.has(ledgerKey))return result(res,400,{error:'Duplicate EMR in submission'});
+          seenLedger.add(ledgerKey);
+        } else if(emr) return result(res,400,{error:'EMR is only accepted for EMR-wise preparation'});
         rows.push([crypto.randomUUID(),new Date().toISOString(),uid,me.name,body.date,body.branch,body.category,task,emr,remarks,normalizedQuantity,hours]);
       }
       if(body.action==='saveReport'){

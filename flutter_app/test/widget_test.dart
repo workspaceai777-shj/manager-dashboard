@@ -43,6 +43,7 @@ class FakeStaffApi extends StaffApi {
         {'id': 'insurance_documents', 'name': 'Insurance Documents Sent'},
         {'id': 'insurance_datewise', 'name': 'Insurance Datewise Updated'},
         {'id': 'insurance_emrwise', 'name': 'Insurance EMRwise Updated'},
+        {'id': 'insurance_ledger_emr', 'name': 'Insurance EMR-wise Entry'},
       ];
     }
     if (category == 'ACCOUNTS') {
@@ -67,6 +68,53 @@ class FakeStaffApi extends StaffApi {
         {
           'id': 'accounts_reception',
           'name': 'Reception Duties and Reporting Vouchers'
+        },
+        {'id': 'accounts_zoho_updation', 'name': 'Zoho updation'},
+        {'id': 'accounts_vat_excel_ontario', 'name': 'Vat excel entry Ontario'},
+        {'id': 'accounts_vat_filing_ontario', 'name': 'Vat filing Ontario'},
+        {
+          'id': 'accounts_vat_excel_whitefox',
+          'name': 'Vat excel updation White fox'
+        },
+        {'id': 'accounts_vat_filing_whitefox', 'name': 'Vat filing White fox'},
+        {
+          'id': 'accounts_cash_in_hand_checking',
+          'name': 'Cash in hand checking'
+        },
+        {
+          'id': 'accounts_staff_attendance',
+          'name': 'Staff attendance Ontario and Whitefox'
+        },
+        {
+          'id': 'accounts_towel_import_invoice',
+          'name':
+              'Towel import invoice preparation, cash collect from customer and excel update'
+        },
+        {
+          'id': 'accounts_medicine_collect_whitefox',
+          'name':
+              'Medicine collect from supplier for whitefox and invoice updated'
+        },
+        {
+          'id': 'accounts_month_end_closing_deposit',
+          'name': 'Month end closing and cash handover for deposit'
+        },
+        {
+          'id': 'accounts_whitefox_consignment_sale',
+          'name': 'White fox Consignment basis sale checking and update'
+        },
+        {
+          'id': 'accounts_petty_cash_voucher_entry',
+          'name': 'Petty cash voucher entry and filing'
+        },
+        {'id': 'accounts_petty_cash_excel', 'name': 'Petty cash excel'},
+        {
+          'id': 'accounts_monthly_collection_excel',
+          'name': 'Monthly collection excel'
+        },
+        {
+          'id': 'accounts_purchase_request_month',
+          'name': 'Purchase request for one month'
         },
       ];
     }
@@ -395,11 +443,14 @@ void main() {
     expect(find.text('R4 Individual Ledgers Created'), findsNothing);
     expect(find.text('Individual Ledgers for Insurance Updated & Showed'),
         findsOneWidget);
-    for (int i = 1; i <= 6; i++) {
+    expect(find.text('Zoho updation'), findsOneWidget);
+    expect(find.text('Purchase request for one month'), findsOneWidget);
+    expect(find.text('Other task carried out'), findsWidgets);
+    for (int i = 1; i <= 21; i++) {
       expect(find.text('$i. '), findsOneWidget);
     }
     expect(find.widgetWithText(InputDecorator, 'Yes / No'), findsNWidgets(5));
-    expect(find.widgetWithText(TextField, 'Quantity'), findsNWidgets(1));
+    expect(find.widgetWithText(TextField, 'Quantity'), findsNWidgets(16));
 
     // Switch to ONT-BB DOCTOR'S ZONE and verify the 3 Doctor's Zone activities
     await tester.tap(find.text('ONT-BR1 — ACCOUNTS'));
