@@ -213,10 +213,24 @@ class _PortalState extends State<Portal> {
       final b = Map<String, dynamic>.from(await api.request('bootstrap'));
       profile = Map<String, dynamic>.from(b['profile'] ?? {});
       assignments = List.from(b['assignments'] ?? []);
-      // A branch/category must be explicitly chosen by the staff member.
-      // Do not pre-load the first assignment: its asynchronous response can
-      // overwrite a different category selected on the login chooser.
-      if (!branchSelected) {
+      // A branch/category must be explicitly chosen by normal staff members.
+      // Admins skip the post-login branch selection screen and load their first
+      // assignment automatically.
+      if (profile['role'] == 'ADMIN') {
+        if (!branchSelected) {
+          branchSelected = true;
+          if (assignments.isNotEmpty) {
+            branch = assignments.first['branch'].toString();
+            category = assignments.first['category'].toString();
+            final taskRes = await api.request('tasks', body: {
+              'branch': branch,
+              'category': category,
+            });
+            tasks = List<dynamic>.from(taskRes['tasks'] ?? []);
+            await restoreReport(branch, category, reportDate);
+          }
+        }
+      } else if (!branchSelected) {
         branch = '';
         category = '';
         tasks = [];
@@ -479,7 +493,11 @@ class _PortalState extends State<Portal> {
                 : 340,
             child: DropdownButton<String>(
                 isExpanded: true,
-                value: '$branch|$category',
+                value: assignments.any((a) =>
+                        '${a['branch']}|${a['category']}' ==
+                        '$branch|$category')
+                    ? '$branch|$category'
+                    : null,
                 items: assignments.map<DropdownMenuItem<String>>((a) {
                   final v = '${a['branch']}|${a['category']}';
                   return DropdownMenuItem(
@@ -874,7 +892,7 @@ class _PortalState extends State<Portal> {
   @override
   Widget build(BuildContext context) => loading
       ? const Scaffold(body: Center(child: CircularProgressIndicator()))
-      : !branchSelected
+      : (!branchSelected && !manager)
           ? Scaffold(body: branchSelector())
           : responsivePortal(context);
 }

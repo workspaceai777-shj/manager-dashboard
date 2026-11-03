@@ -419,14 +419,13 @@ void main() {
       await tester.binding.setSurfaceSize(Size(width, 900));
       await tester.pumpWidget(MaterialApp(
         theme: TaskLogStyle.dark,
-        home: Portal(api: adminApi),
+        home: Portal(key: ValueKey('admin-$width'), api: adminApi),
       ));
       await tester.pumpAndSettle();
 
-      if (find.text('Select branch and category').evaluate().isNotEmpty) {
-        await tester.tap(find.text('ONT-BB').first);
-        await tester.pumpAndSettle();
-      }
+      // Admin skips the post-login branch selection screen
+      expect(find.text('Select branch and category'), findsNothing);
+      expect(find.text('Daily task report'), findsOneWidget);
 
       expect(find.text('Settings'), findsWidgets);
       await tester.tap(find.byIcon(Icons.settings));
