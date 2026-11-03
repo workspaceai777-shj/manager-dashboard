@@ -302,6 +302,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Performance dashboard'), findsOneWidget);
       expect(find.text('Employee'), findsOneWidget);
+      expect(find.byType(RotatedBox), findsWidgets);
+      expect(find.text('14'), findsWidgets);
+      expect(find.text('12'), findsWidgets);
       expect(tester.takeException(), isNull);
     }
     await tester.binding.setSurfaceSize(null);

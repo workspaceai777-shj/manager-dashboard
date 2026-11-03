@@ -172,69 +172,135 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
             ? const Center(child: Text('No records for selected filters'))
             : LayoutBuilder(builder: (context, c) {
                 final compact = c.maxWidth < 400;
-                return BarChart(BarChartData(
-                  maxY: max * 1.18,
-                  gridData: const FlGridData(show: false),
-                  borderData: FlBorderData(show: false),
-                  titlesData: FlTitlesData(
-                    topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: compact ? 32 : 40,
+                final visible = quantityTasks.take(9).toList();
+                final chartMaxY = max * 1.18;
+                final leftReserved = compact ? 32.0 : 40.0;
+                const bottomReserved = 74.0;
+                const chartHeight = 340.0 - bottomReserved;
+                final rodWidth = compact ? 18.0 : 22.0;
+                return Stack(
+                  children: [
+                    BarChart(BarChartData(
+                      maxY: chartMaxY,
+                      gridData: const FlGridData(show: false),
+                      borderData: FlBorderData(show: false),
+                      titlesData: FlTitlesData(
+                        topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: leftReserved,
+                            maxIncluded: false,
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: bottomReserved,
+                            interval: 1,
+                            getTitlesWidget: (value, meta) {
+                              final index = value.toInt();
+                              if (value != index.toDouble() ||
+                                  index < 0 ||
+                                  index >= visible.length) {
+                                return const SizedBox.shrink();
+                              }
+                              final label =
+                                  visible[index].key.replaceAll('_', ' ');
+                              return SideTitleWidget(
+                                meta: meta,
+                                space: 10,
+                                child: SizedBox(
+                                  width: compact ? 52 : 72,
+                                  child: Text(label,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                          fontSize: 10,
+                                          color: TaskLogStyle.muted,
+                                          height: 1.15)),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      barGroups: visible
+                          .asMap()
+                          .entries
+                          .map((e) => BarChartGroupData(x: e.key, barRods: [
+                                BarChartRodData(
+                                    toY: e.value.value,
+                                    color: TaskLogStyle.teal,
+                                    width: rodWidth,
+                                    borderRadius: const BorderRadius.vertical(
+                                        top: Radius.circular(7)))
+                              ]))
+                          .toList(),
+                    )),
+                    Positioned(
+                      left: leftReserved,
+                      right: 0,
+                      top: 0,
+                      bottom: bottomReserved,
+                      child: IgnorePointer(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: visible.map((entry) {
+                            final value = entry.value;
+                            final barHeight =
+                                ((value / chartMaxY) * chartHeight)
+                                    .clamp(0.0, chartHeight);
+                            final qtyText = value % 1 == 0
+                                ? value.toStringAsFixed(0)
+                                : value.toStringAsFixed(1);
+                            final insideBar = barHeight >= 18;
+                            return Expanded(
+                              child: Align(
+                                alignment: Alignment.bottomCenter,
+                                child: SizedBox(
+                                  width: rodWidth,
+                                  height:
+                                      insideBar ? barHeight : barHeight + 22,
+                                  child: Align(
+                                    alignment: insideBar
+                                        ? Alignment.center
+                                        : Alignment.topCenter,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 2, vertical: 2),
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: RotatedBox(
+                                          quarterTurns: 3,
+                                          child: Text(
+                                            qtyText,
+                                            style: TextStyle(
+                                              fontSize: compact ? 10 : 11,
+                                              fontWeight: FontWeight.w800,
+                                              color: insideBar
+                                                  ? const Color(0xFF061425)
+                                                  : TaskLogStyle.ink,
+                                              height: 1.0,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 74,
-                        interval: 1,
-                        getTitlesWidget: (value, meta) {
-                          final index = value.toInt();
-                          final visible = quantityTasks.take(9).toList();
-                          if (value != index.toDouble() ||
-                              index < 0 ||
-                              index >= visible.length) {
-                            return const SizedBox.shrink();
-                          }
-                          final label = visible[index].key.replaceAll('_', ' ');
-                          return SideTitleWidget(
-                            meta: meta,
-                            space: 10,
-                            child: SizedBox(
-                              width: compact ? 52 : 72,
-                              child: Text(label,
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                      fontSize: 10,
-                                      color: TaskLogStyle.muted,
-                                      height: 1.15)),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  barGroups: quantityTasks
-                      .take(9)
-                      .toList()
-                      .asMap()
-                      .entries
-                      .map((e) => BarChartGroupData(x: e.key, barRods: [
-                            BarChartRodData(
-                                toY: e.value.value,
-                                color: TaskLogStyle.teal,
-                                width: compact ? 13 : 18,
-                                borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(7)))
-                          ]))
-                      .toList(),
-                ));
+                  ],
+                );
               }),
       ),
     );
