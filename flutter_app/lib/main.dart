@@ -205,13 +205,13 @@ class _PortalState extends State<Portal> {
     if(assignments.isEmpty) return const Text('No branch/category assignment. Contact your administrator.');
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Wrap(spacing:12,runSpacing:8,children: [
-        DropdownButton<String>(value:'$branch|$category',items:assignments.map<DropdownMenuItem<String>>((a){
-          final v='${a['branch']}|${a['category']}';return DropdownMenuItem(value:v,child:Text('${a['branch']} — ${a['category']}'));
+        SizedBox(width:MediaQuery.sizeOf(context).width<720 ? MediaQuery.sizeOf(context).width-32 : 340,child:DropdownButton<String>(isExpanded:true,value:'$branch|$category',items:assignments.map<DropdownMenuItem<String>>((a){
+          final v='${a['branch']}|${a['category']}';return DropdownMenuItem(value:v,child:Text('${a['branch']} — ${a['category']}',overflow:TextOverflow.ellipsis));
         }).toList(),onChanged:(v) async {
           if (v == null) return;
           final selection = v.split('|');
           await selectAssignment(selection[0], selection[1]);
-        }),
+        })),
         OutlinedButton.icon(onPressed:() async {final x=await showDatePicker(context:context,initialDate:reportDate,firstDate:DateTime(2024),lastDate:DateTime(2035));if(x!=null)setState(()=>reportDate=x);}, icon:const Icon(Icons.calendar_month),label:Text(_date(reportDate))),
       ]),
       const SizedBox(height:24), const Text('Daily task report',style:TextStyle(fontWeight:FontWeight.w800,fontSize:27,color:TaskLogStyle.ink)),
