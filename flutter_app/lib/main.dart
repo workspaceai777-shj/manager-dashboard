@@ -43,7 +43,7 @@ class _LoginPageState extends State<LoginPage> {
       child: Card(child: Padding(padding: const EdgeInsets.all(24), child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.local_hospital_rounded, size: 54, color: TaskLogStyle.teal),
+          const TaskLogBrandMark(size: 54),
           const SizedBox(height: 12),
           const Text('Ontario Staff Portal', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           TextField(controller: email, decoration: const InputDecoration(labelText: 'Email')),
@@ -357,7 +357,7 @@ class _PortalState extends State<Portal> {
     );
     if (narrow) {
       return Scaffold(
-        appBar:AppBar(title:const Row(mainAxisSize:MainAxisSize.min,children:[Icon(Icons.local_hospital_rounded,color:TaskLogStyle.teal),SizedBox(width:10),Flexible(child:Text('Ontario | TaskLog',overflow:TextOverflow.ellipsis))]),actions:[
+        appBar:AppBar(title:const Row(mainAxisSize:MainAxisSize.min,children:[TaskLogBrandMark(size:32),SizedBox(width:10),Flexible(child:Text('Ontario | TaskLog',overflow:TextOverflow.ellipsis))]),actions:[
           IconButton(onPressed:()=>FirebaseAuth.instance.signOut(),
             icon:const Icon(Icons.logout),tooltip:'Sign out'),
         ]),
@@ -385,8 +385,7 @@ class _PortalState extends State<Portal> {
           extended:MediaQuery.sizeOf(context).width>1100,
           selectedIndex:index,
           leading:const Padding(padding:EdgeInsets.only(top:22,bottom:30),
-            child:CircleAvatar(radius:24,backgroundColor:Color(0xFF285277),
-              child:Icon(Icons.spa,color:Colors.white))),
+            child:TaskLogBrandMark(size:48)),
           destinations:const [
             NavigationRailDestination(icon:Icon(Icons.edit_note),label:Text('Daily Tasks')),
             NavigationRailDestination(icon:Icon(Icons.bar_chart),label:Text('Dashboard')),
