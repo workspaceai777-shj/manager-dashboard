@@ -100,6 +100,55 @@ class _PortalState extends State<Portal> {
     } catch (e) { error = e.toString(); }
     if (mounted) setState(() => loading = false);
   }
+  Future<void> selectAssignment(String nextBranch, String nextCategory) async {
+    if (!assignments.any((a) =>
+        a['branch'] == nextBranch && a['category'] == nextCategory)) {
+      message('This branch/category is not assigned to your account');
+      return;
+    }
+    setState(() => loading = true);
+    try {
+      final response = await api.request('tasks', body: {
+        'branch': nextBranch,
+        'category': nextCategory,
+      });
+      final nextTasks = List<dynamic>.from(response['tasks'] ?? []);
+      if (!mounted) return;
+      for (final controller in qty.values) {
+        controller.dispose();
+      }
+      for (final controller in hours.values) {
+        controller.dispose();
+      }
+      qty.clear();
+      hours.clear();
+      for (final controller in emr) {
+        controller.dispose();
+      }
+      for (final controller in remark) {
+        controller.dispose();
+      }
+      for (final controller in mins) {
+        controller.dispose();
+      }
+      emr.clear();
+      remark.clear();
+      mins.clear();
+      setState(() {
+        branch = nextBranch;
+        category = nextCategory;
+        tasks = nextTasks;
+        branchSelected = true;
+        page = 'Daily Tasks';
+        error = '';
+      });
+    } catch (e) {
+      message('Unable to load tasks: $e');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
   String _date(DateTime d) => '${d.year.toString().padLeft(4,"0")}-${d.month.toString().padLeft(2,"0")}-${d.day.toString().padLeft(2,"0")}';
   bool get manager => profile['role'] == 'ADMIN' || profile['role'] == 'MANAGER';
   void message(String s) { if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s))); }
@@ -139,10 +188,9 @@ class _PortalState extends State<Portal> {
         DropdownButton<String>(value:'$branch|$category',items:assignments.map<DropdownMenuItem<String>>((a){
           final v='${a['branch']}|${a['category']}';return DropdownMenuItem(value:v,child:Text('${a['branch']} — ${a['category']}'));
         }).toList(),onChanged:(v) async {
-          if(v==null)return;
-          final x=v.split('|'); setState((){branch=x[0];category=x[1];tasks=[];});
-          try {final r=await api.request('tasks',body:{'branch':branch,'category':category});setState(()=>tasks=List.from(r['tasks']));}
-          catch(e){message(e.toString());}
+          if (v == null) return;
+          final selection = v.split('|');
+          await selectAssignment(selection[0], selection[1]);
         }),
         OutlinedButton.icon(onPressed:() async {final x=await showDatePicker(context:context,initialDate:reportDate,firstDate:DateTime(2024),lastDate:DateTime(2035));if(x!=null)setState(()=>reportDate=x);}, icon:const Icon(Icons.calendar_month),label:Text(_date(reportDate))),
       ]),
@@ -185,7 +233,37 @@ class _PortalState extends State<Portal> {
     refresh: () async {setState(()=>loading=true);await load();},
   );
 
-  Widget branchSelector() => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('Select your working branch'), ...assignments.map((a) => TextButton(onPressed: () => setState(() { branch = a['branch']; category = a['category']; branchSelected = true; }), child: Text("${a['branch']} — ${a['category']}")))]));
+  Widget branchSelector() => Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 520),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.business_outlined, size: 40, color: TaskLogStyle.teal),
+            const SizedBox(height: 12),
+            const Text('Select branch and category',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('Choose the task report you want to open.'),
+            const SizedBox(height: 16),
+            if (assignments.isEmpty)
+              Text(error.isEmpty
+                  ? 'No branch/category assignment. Contact your administrator.'
+                  : error),
+            ...assignments.map((a) => ListTile(
+              leading: const Icon(Icons.work_outline),
+              title: Text(a['branch'].toString()),
+              subtitle: Text(a['category'].toString()),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => selectAssignment(
+                a['branch'].toString(), a['category'].toString()),
+            )),
+          ]),
+        ),
+      ),
+    ),
+  );
 
   Widget settings() {
     return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
