@@ -11,17 +11,18 @@ class TaskLogStyle {
   static const border = Color(0xFF34445D);
 
   static BoxDecoration get glass => BoxDecoration(
-    gradient: const LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [Color(0xFF1F3450), Color(0xFF111C32)],
-    ),
-    border: Border.all(color: const Color(0xFF3B516F), width: 0.8),
-    borderRadius: BorderRadius.circular(20),
-    boxShadow: const [
-      BoxShadow(color: Color(0x32000000), blurRadius: 22, offset: Offset(0, 12)),
-    ],
-  );
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1F3450), Color(0xFF111C32)],
+        ),
+        border: Border.all(color: const Color(0xFF3B516F), width: 0.8),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x32000000), blurRadius: 22, offset: Offset(0, 12)),
+        ],
+      );
 
   static ThemeData get light => dark;
   static ThemeData get dark {
@@ -36,13 +37,15 @@ class TaskLogStyle {
       colorScheme: scheme,
       scaffoldBackgroundColor: canvas,
       fontFamily: 'Roboto',
-      textTheme: ThemeData.dark().textTheme.apply(bodyColor: ink, displayColor: ink),
+      textTheme:
+          ThemeData.dark().textTheme.apply(bodyColor: ink, displayColor: ink),
       appBarTheme: const AppBarTheme(
         backgroundColor: navy,
         foregroundColor: ink,
         centerTitle: false,
         elevation: 0,
-        titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: ink),
+        titleTextStyle:
+            TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: ink),
       ),
       cardTheme: CardThemeData(
         color: surface,
@@ -59,7 +62,8 @@ class TaskLogStyle {
           foregroundColor: const Color(0xFF061425),
           minimumSize: const Size(120, 48),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -67,7 +71,8 @@ class TaskLogStyle {
           foregroundColor: ink,
           minimumSize: const Size(48, 48),
           side: const BorderSide(color: border),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -75,7 +80,8 @@ class TaskLogStyle {
         fillColor: const Color(0xFF17263D),
         labelStyle: const TextStyle(color: muted),
         hintStyle: const TextStyle(color: muted),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -91,16 +97,18 @@ class TaskLogStyle {
         indicatorColor: Color(0xFF1C4B5F),
         selectedIconTheme: IconThemeData(color: teal),
         unselectedIconTheme: IconThemeData(color: muted),
-        selectedLabelTextStyle: TextStyle(color: ink, fontWeight: FontWeight.w700),
+        selectedLabelTextStyle:
+            TextStyle(color: ink, fontWeight: FontWeight.w700),
         unselectedLabelTextStyle: TextStyle(color: muted),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: navy,
         indicatorColor: const Color(0xFF1C4B5F),
-        labelTextStyle: WidgetStateProperty.all(const TextStyle(fontSize: 11, color: ink)),
+        labelTextStyle:
+            WidgetStateProperty.all(const TextStyle(fontSize: 11, color: ink)),
         iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
-          color: states.contains(WidgetState.selected) ? teal : muted,
-        )),
+              color: states.contains(WidgetState.selected) ? teal : muted,
+            )),
       ),
       dividerColor: border,
     );
@@ -113,14 +121,14 @@ class TaskLogBrandMark extends StatelessWidget {
   final double size;
   @override
   Widget build(BuildContext context) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(
-      color: const Color(0xFF08101E),
-      border: Border.all(color: TaskLogStyle.border),
-      borderRadius: BorderRadius.circular(size * 0.25),
-    ),
-    alignment: Alignment.center,
-    child: Icon(Icons.add_rounded, color: Colors.white, size: size * 0.76),
-  );
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: const Color(0xFF08101E),
+          border: Border.all(color: TaskLogStyle.border),
+          borderRadius: BorderRadius.circular(size * 0.25),
+        ),
+        alignment: Alignment.center,
+        child: Icon(Icons.add_rounded, color: Colors.white, size: size * 0.76),
+      );
 }

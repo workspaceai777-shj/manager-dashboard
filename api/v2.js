@@ -100,10 +100,11 @@ export default async function handler(req,res){
   // Flutter Web uses a cross-origin Authorization header, which requires
   // browsers to perform an OPTIONS preflight before the authenticated POST.
   const origin = req.headers.origin;
+  const defaultOrigins = ['https://tasklog-web.vercel.app', 'https://tasklog-web-ambu7.vercel.app'];
   const configuredOrigins = (process.env.ALLOWED_WEB_ORIGINS || '')
     .split(',').map(v => v.trim()).filter(Boolean);
   const localDevelopment = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin || '');
-  const trustedOrigin = !!origin && (localDevelopment || configuredOrigins.includes(origin));
+  const trustedOrigin = !!origin && (localDevelopment || defaultOrigins.includes(origin) || configuredOrigins.includes(origin));
   res.setHeader('Vary', 'Origin');
   if (trustedOrigin) {
     res.setHeader('Access-Control-Allow-Origin', origin);

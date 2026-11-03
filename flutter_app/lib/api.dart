@@ -11,7 +11,10 @@ class StaffApi {
     if (base.isEmpty) throw Exception('API_BASE_URL is not configured');
     final response = await http.post(
       Uri.parse('${base.replaceAll(RegExp(r"/$"), "")}/api/v2'),
-      headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json'
+      },
       body: jsonEncode({'action': action, ...?body}),
     );
     final decoded = jsonDecode(response.body);

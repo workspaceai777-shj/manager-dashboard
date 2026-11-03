@@ -3,178 +3,414 @@ import 'package:fl_chart/fl_chart.dart';
 import 'tasklog_style.dart';
 
 class PerformanceDashboard extends StatefulWidget {
-  const PerformanceDashboard({super.key,required this.records,required this.refresh,required this.isAdmin});
+  const PerformanceDashboard({
+    super.key,
+    required this.records,
+    required this.refresh,
+    required this.isAdmin,
+  });
   final List<dynamic> records;
   final Future<void> Function() refresh;
   final bool isAdmin;
-  @override State<PerformanceDashboard> createState()=>_PerformanceDashboardState();
+  @override
+  State<PerformanceDashboard> createState() => _PerformanceDashboardState();
 }
+
 class _PerformanceDashboardState extends State<PerformanceDashboard> {
-  String branch='ALL',category='ALL',employee='ALL';
+  String branch = 'ALL', category = 'ALL', employee = 'ALL';
   DateTimeRange? period;
   bool todayOnly = true;
-  String dateLabel(DateTime d) => [d.day.toString().padLeft(2,'0'),d.month.toString().padLeft(2,'0'),d.year.toString()].join('/');
-  double num(dynamic x)=>double.tryParse(x.toString())??0;
-  List<String> options(String key) => <String>{'ALL', ...widget.records.map((e) => e[key].toString())}.toList();
-  List<dynamic> get rows=>widget.records.where((e){
-    if (branch != 'ALL' && e['branch'] != branch) { return false; }
-    if (category != 'ALL' && e['category'] != category) { return false; }
-    if (employee != 'ALL' && e['employeeName'] != employee) { return false; }
-    if(todayOnly || period!=null){
-      final d=DateTime.tryParse(e['date'].toString());
-      if(todayOnly){final today=DateTime.now();return d!=null && d.year==today.year && d.month==today.month && d.day==today.day;}
-      if (d == null || d.isBefore(period!.start) || d.isAfter(period!.end)) { return false; }
-    }
-    return true;
-  }).toList();
-  Widget picker(String name,String selected,List<String> opts,ValueChanged<String?> change)=>
-    SizedBox(width:180,child:DropdownButtonFormField<String>(key:ValueKey(name+selected),
-      value:opts.contains(selected)?selected:'ALL',
-      decoration:InputDecoration(labelText:name,isDense:true),
-      items:opts.map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),
-      onChanged:change));
-  Widget tile(String title,String val,IconData icon,Color color)=>
-    Container(width:MediaQuery.sizeOf(context).width<620 ? (MediaQuery.sizeOf(context).width-48)/2 : 220,padding:const EdgeInsets.all(16),
-      decoration:BoxDecoration(gradient:const LinearGradient(colors:[Color(0xFF20334F),Color(0xFF132138)]),borderRadius:BorderRadius.circular(20),
-        border:Border.all(color:TaskLogStyle.border)),
-      child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        CircleAvatar(backgroundColor:color.withValues(alpha:0.1),child:Icon(icon,color:color)),
-        const SizedBox(height:16),
-        Text(val,style:const TextStyle(fontSize:25,fontWeight:FontWeight.w800,color:TaskLogStyle.ink)),
-        Text(title,maxLines:2,style:const TextStyle(fontSize:12,color:TaskLogStyle.muted)),
-      ]));
-  Widget panel(String title,Widget child)=>Container(
-    padding:const EdgeInsets.all(22),
-    decoration:BoxDecoration(gradient:const LinearGradient(colors:[Color(0xFF20334F),Color(0xFF132138)]),borderRadius:BorderRadius.circular(20),
-      border:Border.all(color:TaskLogStyle.border)),
-    child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Text(title,style:const TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
-      const SizedBox(height:16),child,
-    ]));
-  @override Widget build(BuildContext context){
-    final totals=<String,double>{}, hours=<String,double>{},byEmployee=<String,double>{};
-    for(final e in rows){
-      final task=e['taskId'].toString();
-      totals[task]=(totals[task]??0)+num(e['quantity']);
-      hours[task]=(hours[task]??0)+num(e['hours']);
-      if(task=='ledger_prepared'||task=='ledger_updated'){
-        final name=e['employeeName'].toString();
-        byEmployee[name]=(byEmployee[name]??0)+num(e['quantity']);
+
+  String dateLabel(DateTime d) => [
+        d.day.toString().padLeft(2, '0'),
+        d.month.toString().padLeft(2, '0'),
+        d.year.toString()
+      ].join('/');
+
+  double num(dynamic x) => double.tryParse(x.toString()) ?? 0;
+
+  List<String> options(String key) =>
+      <String>{'ALL', ...widget.records.map((e) => e[key].toString())}.toList();
+
+  List<dynamic> get rows => widget.records.where((e) {
+        if (branch != 'ALL' && e['branch'] != branch) {
+          return false;
+        }
+        if (category != 'ALL' && e['category'] != category) {
+          return false;
+        }
+        if (employee != 'ALL' && e['employeeName'] != employee) {
+          return false;
+        }
+        if (todayOnly || period != null) {
+          final d = DateTime.tryParse(e['date'].toString());
+          if (todayOnly) {
+            final today = DateTime.now();
+            return d != null &&
+                d.year == today.year &&
+                d.month == today.month &&
+                d.day == today.day;
+          }
+          if (d == null ||
+              d.isBefore(period!.start) ||
+              d.isAfter(period!.end)) {
+            return false;
+          }
+        }
+        return true;
+      }).toList();
+
+  Widget picker(String name, String selected, List<String> opts,
+          ValueChanged<String?> change) =>
+      SizedBox(
+        width: 180,
+        child: InputDecorator(
+          decoration: InputDecoration(labelText: name, isDense: true),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              key: ValueKey(name + selected),
+              isExpanded: true,
+              isDense: true,
+              value: opts.contains(selected) ? selected : 'ALL',
+              items: opts
+                  .map((v) => DropdownMenuItem(
+                        value: v,
+                        child: Text(v, overflow: TextOverflow.ellipsis),
+                      ))
+                  .toList(),
+              onChanged: change,
+            ),
+          ),
+        ),
+      );
+
+  Widget tile(String title, String val, IconData icon, Color color) =>
+      Container(
+        width: MediaQuery.sizeOf(context).width < 620
+            ? (MediaQuery.sizeOf(context).width - 48) / 2
+            : 220,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+              colors: [Color(0xFF20334F), Color(0xFF132138)]),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: TaskLogStyle.border),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          CircleAvatar(
+              backgroundColor: color.withValues(alpha: 0.1),
+              child: Icon(icon, color: color)),
+          const SizedBox(height: 16),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(val,
+                style: const TextStyle(
+                    fontSize: 25,
+                    fontWeight: FontWeight.w800,
+                    color: TaskLogStyle.ink)),
+          ),
+          Text(title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: TaskLogStyle.muted)),
+        ]),
+      );
+
+  Widget panel(String title, Widget child) => Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+              colors: [Color(0xFF20334F), Color(0xFF132138)]),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: TaskLogStyle.border),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title,
+              style:
+                  const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          child,
+        ]),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final totals = <String, double>{},
+        hours = <String, double>{},
+        byEmployee = <String, double>{};
+    for (final e in rows) {
+      final task = e['taskId'].toString();
+      totals[task] = (totals[task] ?? 0) + num(e['quantity']);
+      hours[task] = (hours[task] ?? 0) + num(e['hours']);
+      if (task == 'ledger_prepared' || task == 'ledger_updated') {
+        final name = e['employeeName'].toString();
+        byEmployee[name] = (byEmployee[name] ?? 0) + num(e['quantity']);
       }
     }
-    final quantityTasks=totals.entries.where((e)=>e.key!='collection').toList()
-      ..sort((a,b)=>b.value.compareTo(a.value));
-    final hourTasks=hours.entries.where((e)=>e.value>0).toList()
-      ..sort((a,b)=>b.value.compareTo(a.value));
-    final totalHours=hours.values.fold(0.0,(a,b)=>a+b);
-    final max=quantityTasks.isEmpty?1.0:quantityTasks.first.value+1;
-    const chartColors=[Color(0xFF34D5C0),Color(0xFF579FE8),Color(0xFFB18AF1),
-      Color(0xFFE6A34C),Color(0xFFE67988),Color(0xFF52B9AA)];
-    final chart1=panel('Task quantities',SizedBox(height:340,child:quantityTasks.isEmpty
-      ?const Center(child:Text('No records for selected filters'))
-      :BarChart(BarChartData(maxY:max*1.18,gridData:const FlGridData(show:false),
-        borderData:FlBorderData(show:false),
-        titlesData:FlTitlesData(topTitles:const AxisTitles(sideTitles:SideTitles(showTitles:false)),
-          rightTitles:const AxisTitles(sideTitles:SideTitles(showTitles:false)),
-          bottomTitles:AxisTitles(sideTitles:SideTitles(
-            showTitles:true,
-            reservedSize:74,
-            interval:1,
-            getTitlesWidget:(value,meta) {
-              final index=value.toInt();
-              final visible=quantityTasks.take(9).toList();
-              if(value!=index.toDouble() || index<0 || index>=visible.length) {
-                return const SizedBox.shrink();
+    final quantityTasks = totals.entries
+        .where((e) => e.key != 'collection')
+        .toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final hourTasks = hours.entries.where((e) => e.value > 0).toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final totalHours = hours.values.fold(0.0, (a, b) => a + b);
+    final max = quantityTasks.isEmpty ? 1.0 : quantityTasks.first.value + 1;
+    const chartColors = [
+      Color(0xFF34D5C0),
+      Color(0xFF579FE8),
+      Color(0xFFB18AF1),
+      Color(0xFFE6A34C),
+      Color(0xFFE67988),
+      Color(0xFF52B9AA)
+    ];
+    final chart1 = panel(
+      'Task quantities',
+      SizedBox(
+        height: 340,
+        child: quantityTasks.isEmpty
+            ? const Center(child: Text('No records for selected filters'))
+            : LayoutBuilder(builder: (context, c) {
+                final compact = c.maxWidth < 400;
+                return BarChart(BarChartData(
+                  maxY: max * 1.18,
+                  gridData: const FlGridData(show: false),
+                  borderData: FlBorderData(show: false),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: compact ? 32 : 40,
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 74,
+                        interval: 1,
+                        getTitlesWidget: (value, meta) {
+                          final index = value.toInt();
+                          final visible = quantityTasks.take(9).toList();
+                          if (value != index.toDouble() ||
+                              index < 0 ||
+                              index >= visible.length) {
+                            return const SizedBox.shrink();
+                          }
+                          final label = visible[index].key.replaceAll('_', ' ');
+                          return SideTitleWidget(
+                            meta: meta,
+                            space: 10,
+                            child: SizedBox(
+                              width: compact ? 52 : 72,
+                              child: Text(label,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      fontSize: 10,
+                                      color: TaskLogStyle.muted,
+                                      height: 1.15)),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  barGroups: quantityTasks
+                      .take(9)
+                      .toList()
+                      .asMap()
+                      .entries
+                      .map((e) => BarChartGroupData(x: e.key, barRods: [
+                            BarChartRodData(
+                                toY: e.value.value,
+                                color: TaskLogStyle.teal,
+                                width: compact ? 13 : 18,
+                                borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(7)))
+                          ]))
+                      .toList(),
+                ));
+              }),
+      ),
+    );
+    final chart2 = panel(
+      'Time spent by activity',
+      SizedBox(
+        height: 280,
+        child: hourTasks.isEmpty
+            ? const Center(child: Text('No hours recorded'))
+            : LayoutBuilder(builder: (context, c) {
+                final compact = c.maxWidth < 340;
+                return Row(children: [
+                  Expanded(
+                    child: PieChart(PieChartData(
+                      centerSpaceRadius: compact ? 30 : 45,
+                      sections: hourTasks
+                          .take(6)
+                          .toList()
+                          .asMap()
+                          .entries
+                          .map((e) => PieChartSectionData(
+                              value: e.value.value,
+                              color: chartColors[e.key % 6],
+                              radius: compact ? 34 : 44,
+                              showTitle: false))
+                          .toList(),
+                    )),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: compact ? 112 : 160,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${totalHours.toStringAsFixed(2)} hours',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: compact ? 15 : 18)),
+                        const SizedBox(height: 8),
+                        ...hourTasks.take(5).map((e) => Padding(
+                            padding: const EdgeInsets.only(bottom: 5),
+                            child: Text(
+                                "${e.key.replaceAll('_', ' ')} — ${e.value.toStringAsFixed(1)}h",
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 11)))),
+                      ],
+                    ),
+                  ),
+                ]);
+              }),
+      ),
+    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(widget.isAdmin ? 'Performance dashboard' : 'My performance',
+                style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: TaskLogStyle.ink)),
+            const SizedBox(height: 5),
+            const Text('A clear view of daily activity, hours and ledger work',
+                style: TextStyle(color: TaskLogStyle.muted)),
+          ]),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton.icon(
+            onPressed: widget.refresh,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh'))
+      ]),
+      const SizedBox(height: 24),
+      Wrap(spacing: 12, runSpacing: 12, children: [
+        picker('Branch', branch, options('branch'),
+            (v) => setState(() => branch = v ?? 'ALL')),
+        picker('Category', category, options('category'),
+            (v) => setState(() => category = v ?? 'ALL')),
+        if (widget.isAdmin)
+          picker('Employee', employee, options('employeeName'),
+              (v) => setState(() => employee = v ?? 'ALL')),
+        FilledButton.tonalIcon(
+            icon: const Icon(Icons.today),
+            onPressed: () => setState(() {
+                  todayOnly = true;
+                  period = null;
+                }),
+            label: Text('Today — ${dateLabel(DateTime.now())}')),
+        OutlinedButton.icon(
+            icon: const Icon(Icons.date_range),
+            onPressed: () async {
+              final v = await showDateRangePicker(
+                  context: context,
+                  firstDate: DateTime(2024),
+                  lastDate: DateTime(2036),
+                  initialDateRange: period);
+              if (v != null) {
+                setState(() {
+                  todayOnly = false;
+                  period = v;
+                });
               }
-              final label=visible[index].key.replaceAll('_',' ');
-              return SideTitleWidget(
-                meta:meta,
-                space:10,
-                child:SizedBox(
-                  width:72,
-                  child:Text(label,
-                    maxLines:3,
-                    overflow:TextOverflow.ellipsis,
-                    textAlign:TextAlign.center,
-                    style:const TextStyle(fontSize:10,color:TaskLogStyle.muted,height:1.15)),
-                ),
-              );
             },
-          ))),
-        barGroups:quantityTasks.take(9).toList().asMap().entries.map((e)=>
-          BarChartGroupData(x:e.key,barRods:[BarChartRodData(toY:e.value.value,
-            color:TaskLogStyle.teal,width:18,
-            borderRadius:const BorderRadius.vertical(top:Radius.circular(7)))] )).toList(),
-      ))));
-    final chart2=panel('Time spent by activity',SizedBox(height:280,child:hourTasks.isEmpty
-      ?const Center(child:Text('No hours recorded'))
-      :Row(children:[
-        Expanded(child:PieChart(PieChartData(centerSpaceRadius:45,sections:
-          hourTasks.take(6).toList().asMap().entries.map((e)=>
-            PieChartSectionData(value:e.value.value,color:chartColors[e.key%6],
-              radius:44,showTitle:false)).toList()))),
-        SizedBox(width:MediaQuery.sizeOf(context).width<620?110:160,child:Column(mainAxisAlignment:MainAxisAlignment.center,
-          crossAxisAlignment:CrossAxisAlignment.start,children:[
-          Text('${totalHours.toStringAsFixed(2)} hours',
-            style:const TextStyle(fontWeight:FontWeight.w700,fontSize:18)),
-          const SizedBox(height:8),
-          ...hourTasks.take(5).map((e)=>Padding(padding:const EdgeInsets.only(bottom:5),
-            child:Text("${e.key.replaceAll('_', ' ')} — ${e.value.toStringAsFixed(1)}h",
-              maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11)))),
-        ])),
-      ])));
-    return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Row(children:[Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Text(widget.isAdmin?'Performance dashboard':'My performance',style:TextStyle(fontSize:26,fontWeight:FontWeight.w800,color:TaskLogStyle.ink)),
-        SizedBox(height:5),
-        Text('A clear view of daily activity, hours and ledger work',
-          style:TextStyle(color:TaskLogStyle.muted)),
-      ])),OutlinedButton.icon(onPressed:widget.refresh,icon:const Icon(Icons.refresh),label:const Text('Refresh'))]),
-      const SizedBox(height:24),
-      Wrap(spacing:12,runSpacing:12,children:[
-        picker('Branch',branch,options('branch'),(v)=>setState(()=>branch=v??'ALL')),
-        picker('Category',category,options('category'),(v)=>setState(()=>category=v??'ALL')),
-        if (widget.isAdmin) picker('Employee', employee, options('employeeName'), (v) => setState(() => employee = v ?? 'ALL')),
-        FilledButton.tonalIcon(icon:const Icon(Icons.today),
-          onPressed:()=>setState((){todayOnly=true;period=null;}),
-          label:Text('Today — ${dateLabel(DateTime.now())}')),
-        OutlinedButton.icon(icon:const Icon(Icons.date_range),
-          onPressed:() async {final v=await showDateRangePicker(context:context,
-            firstDate:DateTime(2024),lastDate:DateTime(2036),initialDateRange:period);
-            if (v != null) { setState(() { todayOnly = false; period = v; }); }},
-          label:Text(period == null ? 'Choose date range' : '${dateLabel(period!.start)} – ${dateLabel(period!.end)}')),
-        TextButton(onPressed:()=>setState((){todayOnly=false;period=null;}),child:const Text('All loaded dates')),
+            label: Text(period == null
+                ? 'Choose date range'
+                : '${dateLabel(period!.start)} – ${dateLabel(period!.end)}')),
+        TextButton(
+            onPressed: () => setState(() {
+                  todayOnly = false;
+                  period = null;
+                }),
+            child: const Text('All loaded dates')),
       ]),
-      const SizedBox(height:24),
-      Wrap(spacing:10,runSpacing:10,children:[
-        tile('Ledgers prepared',(totals['ledger_prepared']??0).toStringAsFixed(0),
-          Icons.menu_book_outlined,chartColors[1]),
-        tile('Ledgers updated',(totals['ledger_updated']??0).toStringAsFixed(0),
-          Icons.edit_document,chartColors[0]),
-        tile('Total task hours',totalHours.toStringAsFixed(2),Icons.schedule,chartColors[3]),
-        tile('Collection (AED)',(totals['collection']??0).toStringAsFixed(2),
-          Icons.account_balance_wallet_outlined,chartColors[2]),
+      const SizedBox(height: 24),
+      Wrap(spacing: 10, runSpacing: 10, children: [
+        tile(
+            'Ledgers prepared',
+            (totals['ledger_prepared'] ?? 0).toStringAsFixed(0),
+            Icons.menu_book_outlined,
+            chartColors[1]),
+        tile(
+            'Ledgers updated',
+            (totals['ledger_updated'] ?? 0).toStringAsFixed(0),
+            Icons.edit_document,
+            chartColors[0]),
+        tile('Total task hours', totalHours.toStringAsFixed(2), Icons.schedule,
+            chartColors[3]),
+        tile('Collection (AED)', (totals['collection'] ?? 0).toStringAsFixed(2),
+            Icons.account_balance_wallet_outlined, chartColors[2]),
       ]),
-      const SizedBox(height:20),
-      LayoutBuilder(builder:(context,c)=>c.maxWidth>850
-        ?Row(crossAxisAlignment:CrossAxisAlignment.start,children:[
-          Expanded(child:chart1),const SizedBox(width:16),Expanded(child:chart2)])
-        :Column(children:[chart1,const SizedBox(height:16),chart2])),
-      const SizedBox(height:20),
-      panel('Ledger activity by employee',byEmployee.isEmpty
-        ?const Text('No ledger records')
-        :Column(children:byEmployee.entries.map((e)=>Padding(
-          padding:const EdgeInsets.symmetric(vertical:10),
-          child:Row(children:[
-            SizedBox(width:140,child:Text(e.key,overflow:TextOverflow.ellipsis)),
-            Expanded(child:LinearProgressIndicator(value:(e.value/25).clamp(0.0,1.0),
-              minHeight:10,borderRadius:BorderRadius.circular(12))),
-            const SizedBox(width:14),
-            Text(e.value.toStringAsFixed(0),style:const TextStyle(fontWeight:FontWeight.w700)),
-          ]))).toList())),
-      const SizedBox(height:12),
-      const Text('Ledger bars show recorded quantities, not target achievement.',
-        style:TextStyle(color:TaskLogStyle.muted,fontSize:12)),
+      const SizedBox(height: 20),
+      LayoutBuilder(
+          builder: (context, c) => c.maxWidth > 850
+              ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(child: chart1),
+                  const SizedBox(width: 16),
+                  Expanded(child: chart2)
+                ])
+              : Column(children: [chart1, const SizedBox(height: 16), chart2])),
+      const SizedBox(height: 20),
+      panel(
+          'Ledger activity by employee',
+          byEmployee.isEmpty
+              ? const Text('No ledger records')
+              : Column(
+                  children: byEmployee.entries
+                      .map((e) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Row(children: [
+                            SizedBox(
+                                width: MediaQuery.sizeOf(context).width < 420
+                                    ? 100
+                                    : 140,
+                                child: Text(e.key,
+                                    overflow: TextOverflow.ellipsis)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                                child: LinearProgressIndicator(
+                                    value: (e.value / 25).clamp(0.0, 1.0),
+                                    minHeight: 10,
+                                    borderRadius: BorderRadius.circular(12))),
+                            const SizedBox(width: 14),
+                            Text(e.value.toStringAsFixed(0),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700)),
+                          ])))
+                      .toList())),
+      const SizedBox(height: 12),
+      const Text(
+          'Ledger bars show recorded quantities, not target achievement.',
+          style: TextStyle(color: TaskLogStyle.muted, fontSize: 12)),
     ]);
   }
 }
