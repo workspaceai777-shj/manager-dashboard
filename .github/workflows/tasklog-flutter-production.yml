@@ -1,0 +1,81 @@
+name: TaskLog Flutter production
+on:
+  push:
+    branches: [flutter-staff-app-v1]
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/tasklog-flutter-production.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: tasklog-frontend-production
+  cancel-in-progress: false
+
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Dependencies
+        working-directory: flutter_app
+        run: flutter pub get
+      - name: Analyze
+        working-directory: flutter_app
+        run: flutter analyze
+      - name: Run tests
+        working-directory: flutter_app
+        run: flutter test
+      - name: Validate public build variables
+        env:
+          API_BASE_URL: ${{ vars.TASKLOG_API_BASE_URL }}
+          FIREBASE_API_KEY: ${{ vars.TASKLOG_FIREBASE_API_KEY }}
+          FIREBASE_APP_ID: ${{ vars.TASKLOG_FIREBASE_APP_ID }}
+          FIREBASE_PROJECT_ID: ${{ vars.TASKLOG_FIREBASE_PROJECT_ID }}
+          FIREBASE_AUTH_DOMAIN: ${{ vars.TASKLOG_FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ vars.TASKLOG_FIREBASE_MESSAGING_SENDER_ID }}
+          VERCEL_TOKEN: ${{ secrets.TASKLOG_VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.TASKLOG_VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.TASKLOG_VERCEL_FRONTEND_PROJECT_ID }}
+        run: |
+          for name in API_BASE_URL FIREBASE_API_KEY FIREBASE_APP_ID FIREBASE_PROJECT_ID FIREBASE_AUTH_DOMAIN FIREBASE_MESSAGING_SENDER_ID VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing required configuration: $name"
+              exit 1
+            fi
+          done
+      - name: Compile Flutter Web release
+        working-directory: flutter_app
+        env:
+          API_BASE_URL: ${{ vars.TASKLOG_API_BASE_URL }}
+          FIREBASE_API_KEY: ${{ vars.TASKLOG_FIREBASE_API_KEY }}
+          FIREBASE_APP_ID: ${{ vars.TASKLOG_FIREBASE_APP_ID }}
+          FIREBASE_PROJECT_ID: ${{ vars.TASKLOG_FIREBASE_PROJECT_ID }}
+          FIREBASE_AUTH_DOMAIN: ${{ vars.TASKLOG_FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ vars.TASKLOG_FIREBASE_MESSAGING_SENDER_ID }}
+        run: |
+          flutter build web --release \
+            --dart-define="API_BASE_URL=$API_BASE_URL" \
+            --dart-define="FIREBASE_API_KEY=$FIREBASE_API_KEY" \
+            --dart-define="FIREBASE_APP_ID=$FIREBASE_APP_ID" \
+            --dart-define="FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID" \
+            --dart-define="FIREBASE_AUTH_DOMAIN=$FIREBASE_AUTH_DOMAIN" \
+            --dart-define="FIREBASE_MESSAGING_SENDER_ID=$FIREBASE_MESSAGING_SENDER_ID"
+      - name: Prepare Vercel build output
+        run: |
+          mkdir -p .vercel/output/static
+          cp -a flutter_app/build/web/. .vercel/output/static/
+          printf '%s\n' '{"version":3,"routes":[{"handle":"filesystem"},{"src":"/.*","dest":"/index.html"}]}' > .vercel/output/config.json
+      - name: Deploy frontend to Vercel production
+        env:
+          VERCEL_TOKEN: ${{ secrets.TASKLOG_VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.TASKLOG_VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.TASKLOG_VERCEL_FRONTEND_PROJECT_ID }}
+        run: |
+          npx --yes vercel@latest deploy --prebuilt --prod --yes --token "$VERCEL_TOKEN"
