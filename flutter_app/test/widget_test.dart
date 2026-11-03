@@ -66,6 +66,16 @@ class FakeStaffApi extends StaffApi {
         },
       ];
     }
+    if (category.toUpperCase() == "DOCTOR'S ZONE") {
+      return const [
+        {'id': 'doctors_consultations', 'name': 'Number of Consultations'},
+        {'id': 'doctors_follow_ups', 'name': 'Number of Follow-ups'},
+        {
+          'id': 'doctors_treatments_supervised',
+          'name': 'Number of Treatments Supervised'
+        },
+      ];
+    }
     if (branch == 'ONT-BB') {
       return const [
         {
@@ -113,6 +123,7 @@ class FakeStaffApi extends StaffApi {
             {'branch': 'ONT-BR1', 'category': 'FRONT DESK'},
             {'branch': 'ONT-BB', 'category': 'INSURANCE USER'},
             {'branch': 'ONT-BR1', 'category': 'ACCOUNTS'},
+            {'branch': 'ONT-BB', 'category': "DOCTOR'S ZONE"},
           ],
         };
       case 'tasks':
@@ -386,8 +397,20 @@ void main() {
     expect(find.widgetWithText(InputDecorator, 'Yes / No'), findsNWidgets(5));
     expect(find.widgetWithText(TextField, 'Quantity'), findsNWidgets(1));
 
-    // Switch to ONT-BR1 FRONT DESK and verify branch-specific task
+    // Switch to ONT-BB DOCTOR'S ZONE and verify the 3 Doctor's Zone activities
     await tester.tap(find.text('ONT-BR1 — ACCOUNTS'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("ONT-BB — DOCTOR'S ZONE").last);
+    await tester.pumpAndSettle();
+    expect(find.text('Number of Consultations'), findsOneWidget);
+    expect(find.text('Number of Follow-ups'), findsOneWidget);
+    expect(find.text('Number of Treatments Supervised'), findsOneWidget);
+    for (int i = 1; i <= 3; i++) {
+      expect(find.text('$i. '), findsOneWidget);
+    }
+
+    // Switch to ONT-BR1 FRONT DESK and verify branch-specific task
+    await tester.tap(find.text("ONT-BB — DOCTOR'S ZONE"));
     await tester.pumpAndSettle();
     await tester.tap(find.text('ONT-BR1 — FRONT DESK').last);
     await tester.pumpAndSettle();

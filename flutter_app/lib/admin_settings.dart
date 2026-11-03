@@ -21,7 +21,12 @@ class _AdminSettingsState extends State<AdminSettings> {
   String? editingUid;
 
   static const branches = ['ONT-BB', 'ONT-BR1'];
-  static const categories = ['FRONT DESK', 'INSURANCE USER', 'ACCOUNTS'];
+  static const categories = [
+    'FRONT DESK',
+    'INSURANCE USER',
+    'ACCOUNTS',
+    "DOCTOR'S ZONE",
+  ];
 
   @override
   void initState() {

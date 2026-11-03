@@ -4,7 +4,8 @@ import { google } from 'googleapis';
 const SHEET_ID = process.env.GOOGLE_SHEET_ID || '1Zr7W7P7JUTUR43nDmR1YWmvqYsdctdzmMfM7Px-q7lo';
 const TAB_USERS = 'App_Users', TAB_ASSIGN = 'App_Assignments', TAB_ENTRIES = 'App_Entries';
 const allowedBranches = ['ONT-BB','ONT-BR1'];
-const allowedCategories = ['FRONT DESK','INSURANCE USER','ACCOUNTS'];
+const canonicalCategories = ['FRONT DESK','INSURANCE USER','ACCOUNTS',"DOCTOR'S ZONE"];
+const allowedCategories = [...canonicalCategories,"Doctor's Zone"];
 
 if (!admin.apps.length && process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
   admin.initializeApp({ credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)) });
@@ -70,8 +71,14 @@ const accounts=[
   ['accounts_month_end','Month-End Collection Closing and Bank Deposit Handover'],
   ['accounts_reception','Reception Duties and Reporting Vouchers']
 ];
+const doctorsZone=[
+  ['doctors_consultations','Number of Consultations'],
+  ['doctors_follow_ups','Number of Follow-ups'],
+  ['doctors_treatments_supervised','Number of Treatments Supervised']
+];
 const activities=(branch,cat)=>{
-  const x=cat==='ACCOUNTS'?accounts:cat==='INSURANCE USER'?insurance:branch==='ONT-BB'?bbTasks:[...baseReception,...brLedger,['collection','Daily Collection (AED)']];
+  const c=String(cat||'').toUpperCase();
+  const x=c==="DOCTOR'S ZONE"?doctorsZone:c==='ACCOUNTS'?accounts:c==='INSURANCE USER'?insurance:branch==='ONT-BB'?bbTasks:[...baseReception,...brLedger,['collection','Daily Collection (AED)']];
   return x.map(([id,name])=>({id,name}));
 };
 // A replacement is append-only: older submissions remain available for audit,
@@ -129,7 +136,7 @@ export default async function handler(req,res){
     const check=(branch,category)=> allowedBranches.includes(branch)&&allowedCategories.includes(category)&&(
       me.role==='ADMIN'||assignments.some(a=>a.branch===branch&&a.category===category));
     if(body.action==='bootstrap')return result(res,200,{profile:me,assignments:me.role==='ADMIN'?
-      allowedBranches.flatMap(branch=>allowedCategories.map(category=>({branch,category}))):assignments});
+      allowedBranches.flatMap(branch=>canonicalCategories.map(category=>({branch,category}))):assignments});
     if(body.action==='tasks'){
       if(!check(body.branch,body.category))return result(res,403,{error:'Category not assigned'});
       return result(res,200,{tasks:activities(body.branch,body.category)});

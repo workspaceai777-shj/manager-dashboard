@@ -288,10 +288,18 @@ class _PortalState extends State<Portal> {
         throw StateError(
             'Incorrect Accounts task list returned. Please retry.');
       }
+      if (nextCategory.toUpperCase() == "DOCTOR'S ZONE" &&
+          (nextTasks.isEmpty ||
+              nextTasks
+                  .any((t) => !t['id'].toString().startsWith('doctors_')))) {
+        throw StateError(
+            "Incorrect Doctor's Zone task list returned. Please retry.");
+      }
       if (nextCategory == 'FRONT DESK' &&
           nextTasks.any((t) =>
               t['id'].toString().startsWith('insurance_') ||
-              t['id'].toString().startsWith('accounts_'))) {
+              t['id'].toString().startsWith('accounts_') ||
+              t['id'].toString().startsWith('doctors_'))) {
         throw StateError(
             'Incorrect Front Desk task list returned. Please retry.');
       }
@@ -842,9 +850,12 @@ class _PortalState extends State<Portal> {
           onChanged: (v) => setState(() => newUserBranch = v!)),
       DropdownButton<String>(
           value: newUserCategory,
-          items: ['FRONT DESK', 'INSURANCE USER', 'ACCOUNTS']
-              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-              .toList(),
+          items: [
+            'FRONT DESK',
+            'INSURANCE USER',
+            'ACCOUNTS',
+            "DOCTOR'S ZONE",
+          ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
           onChanged: (v) => setState(() => newUserCategory = v!)),
       FilledButton(
           onPressed: () async {
