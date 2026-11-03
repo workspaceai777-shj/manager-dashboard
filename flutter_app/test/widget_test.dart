@@ -489,6 +489,7 @@ void main() {
     );
     await tester.enterText(qtyField, '5');
     await tester.enterText(hoursField, '90');
+    await tester.ensureVisible(find.text('Save daily report'));
     await tester.tap(find.text('Save daily report'));
     await tester.pumpAndSettle();
 
@@ -499,7 +500,9 @@ void main() {
     );
 
     // Edit the saved report from 5 to 8 and resave
+    await tester.ensureVisible(qtyField);
     await tester.enterText(qtyField, '8');
+    await tester.ensureVisible(find.text('Save daily report'));
     await tester.tap(find.text('Save daily report'));
     await tester.pumpAndSettle();
 
