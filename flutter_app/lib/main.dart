@@ -782,10 +782,16 @@ class _PortalState extends State<Portal> {
   }
 
   Widget dashboard() => PerformanceDashboard(
-        records: entries,
+        records: entries
+            .where((e) =>
+                (e['employeeName'] ?? '').toString().trim().toLowerCase() !=
+                'administrator')
+            .toList(),
         staffNames: users
+            .where((u) =>
+                (u['role'] ?? '').toString().trim().toUpperCase() != 'ADMIN')
             .map((u) => (u['name'] ?? '').toString().trim())
-            .where((s) => s.isNotEmpty)
+            .where((s) => s.isNotEmpty && s.toLowerCase() != 'administrator')
             .toSet()
             .toList(),
         isAdmin: manager,

@@ -46,14 +46,21 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                 : const <String>[];
     return <String>{
       'ALL',
-      ...defaults,
+      ...defaults.where((v) => v.trim().toLowerCase() != 'administrator'),
       ...widget.records
           .map((e) => (e[key] ?? '').toString().trim())
-          .where((v) => v.isNotEmpty),
+          .where((v) =>
+              v.isNotEmpty &&
+              (key != 'employeeName' ||
+                  v.toLowerCase() != 'administrator')),
     }.toList();
   }
 
   List<dynamic> get rows => widget.records.where((e) {
+        if ((e['employeeName'] ?? '').toString().trim().toLowerCase() ==
+            'administrator') {
+          return false;
+        }
         if (branch != 'ALL' && e['branch'] != branch) {
           return false;
         }
@@ -474,9 +481,9 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
               : Column(children: [chart1, const SizedBox(height: 16), chart2])),
       const SizedBox(height: 20),
       panel(
-          'Ledger activity by employee',
+          'Task activity by employee',
           byEmployee.isEmpty
-              ? const Text('No ledger records')
+              ? const Text('No activity records')
               : Column(
                   children: byEmployee.entries
                       .map((e) => Padding(
@@ -502,7 +509,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                       .toList())),
       const SizedBox(height: 12),
       const Text(
-          'Ledger bars show recorded quantities, not target achievement.',
+          'Activity bars show recorded task quantities, not target achievement.',
           style: TextStyle(color: TaskLogStyle.muted, fontSize: 12)),
     ]);
   }

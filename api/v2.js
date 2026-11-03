@@ -193,11 +193,12 @@ export default async function handler(req,res){
       if(body.action==='dashboard'&&me.role!=='ADMIN')
         return result(res,403,{error:'Administrator access required'});
       const all=activeEntries(await readTab(sheets,TAB_ENTRIES));
+      const adminUids=new Set(users.filter(u=>u.role==='ADMIN').map(u=>u.uid));
       const from=validDate(body.from)?body.from:'0000-01-01';
       const to=validDate(body.to)?body.to:'9999-12-31';
       const mine=body.action==='myDashboard';
       return result(res,200,{entries:all.filter(e=>
-        e.date>=from&&e.date<=to&&(!mine||e.uid===uid))});
+        e.date>=from&&e.date<=to&&(mine?e.uid===uid:(!adminUids.has(e.uid)&&String(e.employeeName||'').trim().toLowerCase()!=='administrator')))});
     }
     if(body.action==='users'){
       if(me.role!=='ADMIN')return result(res,403,{error:'Admin access required'});
