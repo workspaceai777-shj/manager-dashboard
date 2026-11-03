@@ -177,6 +177,21 @@ class _PortalState extends State<Portal> {
     }
   }
 
+  Future<void> refreshDashboardData() async {
+    try {
+      final response = await api.request(
+        manager ? 'dashboard' : 'myDashboard',
+        body: {
+          'from': _date(DateTime.now().subtract(const Duration(days:365))),
+          'to': _date(DateTime.now()),
+        },
+      );
+      if (mounted) setState(() => entries = List.from(response['entries'] ?? []));
+    } catch (e) {
+      message('Unable to refresh dashboard: $e');
+    }
+  }
+
   String _date(DateTime d) => '${d.year.toString().padLeft(4,"0")}-${d.month.toString().padLeft(2,"0")}-${d.day.toString().padLeft(2,"0")}';
   bool get manager => profile['role'] == 'ADMIN';
   void message(String s) { if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s))); }
@@ -272,6 +287,7 @@ class _PortalState extends State<Portal> {
         'branch':branch,'category':category,'date':_date(reportDate),'entries':data
       });
       await restoreReport(branch, category, reportDate);
+      await refreshDashboardData();
       message('Daily report saved for ${_date(reportDate)}');
     } catch (e) {message(e.toString());}
   }
@@ -445,7 +461,8 @@ class _PortalState extends State<Portal> {
         body:content,
         bottomNavigationBar:SafeArea(top:false,child:NavigationBar(
           selectedIndex:index,
-          onDestinationSelected:(i)=>setState(()=>page=pages[i]),
+          onDestinationSelected:(i){setState(()=>page=pages[i]);
+            if(pages[i].contains('Dashboard'))refreshDashboardData();},
           destinations:pages.map((p) => NavigationDestination(
             icon:Icon(p=='Daily Tasks'?Icons.edit_note:
               p=='Settings'?Icons.settings:Icons.bar_chart),
@@ -472,7 +489,8 @@ class _PortalState extends State<Portal> {
               p=='Settings'?Icons.settings:Icons.bar_chart),
             label:Text(p),
           )).toList(),
-          onDestinationSelected:(i)=>setState(()=>page=pages[i]),
+          onDestinationSelected:(i){setState(()=>page=pages[i]);
+            if(pages[i].contains('Dashboard'))refreshDashboardData();},
         ),
         Expanded(child:content),
       ]),
