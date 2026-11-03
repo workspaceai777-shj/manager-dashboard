@@ -106,3 +106,21 @@ class TaskLogStyle {
     );
   }
 }
+
+/// Rounded medical plus mark used in the original Ontario Staff Portal.
+class TaskLogBrandMark extends StatelessWidget {
+  const TaskLogBrandMark({super.key, this.size = 34});
+  final double size;
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      color: const Color(0xFF08101E),
+      border: Border.all(color: TaskLogStyle.border),
+      borderRadius: BorderRadius.circular(size * 0.25),
+    ),
+    alignment: Alignment.center,
+    child: Icon(Icons.add_rounded, color: Colors.white, size: size * 0.76),
+  );
+}
