@@ -223,12 +223,36 @@ class _AdminSettingsState extends State<AdminSettings> {
             TextButton.icon(onPressed: refresh,
               icon: const Icon(Icons.refresh), label: const Text('Refresh')),
           ]),
-          ...unique.values.map((u) => ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-            title: Text(u['name'].toString()),
-            subtitle: Text('${u['email']} · ${u['role']}'),
-            trailing: OutlinedButton(onPressed: () => editUser(u),
-              child: const Text('Edit access')),
+          ...unique.values.map((u) => LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 440;
+              if (compact) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(u['name'].toString(),
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text('${u['email']} · ${u['role']}',
+                        softWrap: true, style: const TextStyle(color: TaskLogStyle.muted)),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => editUser(u),
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit access'),
+                    ),
+                    const Divider(),
+                  ]),
+                );
+              }
+              return ListTile(
+                leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                title: Text(u['name'].toString()),
+                subtitle: Text('${u['email']} · ${u['role']}'),
+                trailing: OutlinedButton(
+                  onPressed: () => editUser(u), child: const Text('Edit access')),
+              );
+            },
           )),
         ])),
       ],
