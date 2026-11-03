@@ -43,7 +43,7 @@ class _LoginPageState extends State<LoginPage> {
       child: Card(child: Padding(padding: const EdgeInsets.all(24), child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.local_hospital, size: 54),
+          const Icon(Icons.local_hospital_rounded, size: 54, color: TaskLogStyle.teal),
           const SizedBox(height: 12),
           const Text('Ontario Staff Portal', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           TextField(controller: email, decoration: const InputDecoration(labelText: 'Email')),
@@ -222,13 +222,47 @@ class _PortalState extends State<Portal> {
         final id=t['id'].toString();
         qty.putIfAbsent(id,()=>TextEditingController());
         hours.putIfAbsent(id,()=>TextEditingController());
-        return ConstrainedBox(key:ValueKey('$branch|$category|$id'),constraints:const BoxConstraints(maxWidth:940),child:Card(child:Padding(padding:const EdgeInsets.all(16),child:Wrap(
-          crossAxisAlignment:WrapCrossAlignment.center,spacing:12,runSpacing:8,children:[
-            SizedBox(width:360,child:Text(t['name'],style:const TextStyle(fontWeight:FontWeight.w500))),
-            SizedBox(width:115,child:TextField(controller:qty[id],keyboardType:TextInputType.number,decoration:InputDecoration(labelText:id=='collection'?'AED':'Quantity',isDense:true,border:const OutlineInputBorder()))),
-            SizedBox(width:115,child:TextField(controller:hours[id],keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Hours',isDense:true,border:OutlineInputBorder()))),
-          ],
-        ))));
+        return ConstrainedBox(
+          key: ValueKey('$branch|$category|$id'),
+          constraints: const BoxConstraints(maxWidth: 940),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: LayoutBuilder(builder: (context, constraints) {
+                final compact = constraints.maxWidth < 650;
+                final quantityField = TextField(
+                  controller: qty[id],
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(labelText: id == 'collection' ? 'AED' : 'Quantity'),
+                );
+                final hoursField = TextField(
+                  controller: hours[id],
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Hours'),
+                );
+                if (compact) {
+                  return Column(crossAxisAlignment: CrossAxisAlignment.start,children: [
+                    Text(t['name'].toString(),style:const TextStyle(fontWeight:FontWeight.w600,fontSize:15)),
+                    const SizedBox(height:14),
+                    Row(children:[
+                      Expanded(child:quantityField),
+                      const SizedBox(width:10),
+                      Expanded(child:hoursField),
+                    ]),
+                  ]);
+                }
+                return Row(children:[
+                  Expanded(flex:3,child:Text(t['name'].toString(),
+                    style:const TextStyle(fontWeight:FontWeight.w600))),
+                  const SizedBox(width:16),
+                  Expanded(child:quantityField),
+                  const SizedBox(width:12),
+                  Expanded(child:hoursField),
+                ]);
+              }),
+            ),
+          ),
+        );
       }),
       if(tasks.any((t)=>t['id']=='ledger_prepared')) ...[
         const SizedBox(height:16),
@@ -309,7 +343,7 @@ class _PortalState extends State<Portal> {
     final content = Align(
       alignment: Alignment.topLeft,
       child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal:narrow?16:32,vertical:narrow?18:28),
+        padding: EdgeInsets.symmetric(horizontal:narrow?12:32,vertical:narrow?16:28),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth:1400),
           child: Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
@@ -323,12 +357,12 @@ class _PortalState extends State<Portal> {
     );
     if (narrow) {
       return Scaffold(
-        appBar:AppBar(title:const Text('Ontario | TaskLog'),actions:[
+        appBar:AppBar(title:const Row(mainAxisSize:MainAxisSize.min,children:[Icon(Icons.local_hospital_rounded,color:TaskLogStyle.teal),SizedBox(width:10),Flexible(child:Text('Ontario | TaskLog',overflow:TextOverflow.ellipsis))]),actions:[
           IconButton(onPressed:()=>FirebaseAuth.instance.signOut(),
             icon:const Icon(Icons.logout),tooltip:'Sign out'),
         ]),
         body:content,
-        bottomNavigationBar:NavigationBar(
+        bottomNavigationBar:SafeArea(top:false,child:NavigationBar(
           selectedIndex:index,
           onDestinationSelected:(i)=>setState(()=>page=pages[i]),
           destinations:const [
@@ -336,12 +370,12 @@ class _PortalState extends State<Portal> {
             NavigationDestination(icon:Icon(Icons.bar_chart),label:'Dashboard'),
             NavigationDestination(icon:Icon(Icons.settings),label:'Settings'),
           ],
-        ),
+        )),
       );
     }
     return Scaffold(
       appBar:AppBar(toolbarHeight:72,title:const Row(children:[
-        Icon(Icons.spa,color:TaskLogStyle.teal),SizedBox(width:12),
+        Icon(Icons.local_hospital_rounded,color:TaskLogStyle.teal),SizedBox(width:12),
         Text('Ontario  |  TaskLog')]),actions:[
         TextButton(onPressed:()=>FirebaseAuth.instance.signOut(),child:const Text('Sign out')),
       ]),
