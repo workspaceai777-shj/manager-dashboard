@@ -3,9 +3,10 @@ import 'package:fl_chart/fl_chart.dart';
 import 'tasklog_style.dart';
 
 class PerformanceDashboard extends StatefulWidget {
-  const PerformanceDashboard({super.key,required this.records,required this.refresh});
+  const PerformanceDashboard({super.key,required this.records,required this.refresh,required this.isAdmin});
   final List<dynamic> records;
   final Future<void> Function() refresh;
+  final bool isAdmin;
   @override State<PerformanceDashboard> createState()=>_PerformanceDashboardState();
 }
 class _PerformanceDashboardState extends State<PerformanceDashboard> {
@@ -124,7 +125,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
       ])));
     return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       Row(children:[const Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Text('Performance dashboard',style:TextStyle(fontSize:26,fontWeight:FontWeight.w800,color:TaskLogStyle.ink)),
+        Text(widget.isAdmin?'Performance dashboard':'My performance',style:TextStyle(fontSize:26,fontWeight:FontWeight.w800,color:TaskLogStyle.ink)),
         SizedBox(height:5),
         Text('A clear view of daily activity, hours and ledger work',
           style:TextStyle(color:TaskLogStyle.muted)),
@@ -133,7 +134,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
       Wrap(spacing:12,runSpacing:12,children:[
         picker('Branch',branch,options('branch'),(v)=>setState(()=>branch=v??'ALL')),
         picker('Category',category,options('category'),(v)=>setState(()=>category=v??'ALL')),
-        picker('Employee',employee,options('employeeName'),(v)=>setState(()=>employee=v??'ALL')),
+        if(widget.isAdmin)picker('Employee',employee,options('employeeName'),(v)=>setState(()=>employee=v??'ALL')),
         FilledButton.tonalIcon(icon:const Icon(Icons.today),
           onPressed:()=>setState((){todayOnly=true;period=null;}),
           label:Text('Today — '+dateLabel(DateTime.now()))),
