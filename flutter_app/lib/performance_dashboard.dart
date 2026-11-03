@@ -191,9 +191,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
       final name = e['employeeName'].toString();
       totals[task] = (totals[task] ?? 0) + num(e['quantity']);
       hours[task] = (hours[task] ?? 0) + num(e['hours']);
-      if (task != 'collection') {
-        byEmployee[name] = (byEmployee[name] ?? 0) + num(e['quantity']);
-      }
+      byEmployee[name] = (byEmployee[name] ?? 0) + num(e['hours']);
       if (task == 'other_tasks') {
         final r = (e['remarks'] ?? '').toString().trim();
         if (r.isNotEmpty) otherRemarks.add(r);
@@ -688,32 +686,39 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
           'Task activity by employee',
           byEmployee.isEmpty
               ? const Text('No activity records')
-              : Column(
-                  children: byEmployee.entries
-                      .map((e) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          child: Row(children: [
-                            SizedBox(
-                                width: MediaQuery.sizeOf(context).width < 420
-                                    ? 100
-                                    : 140,
-                                child: Text(e.key,
-                                    overflow: TextOverflow.ellipsis)),
-                            const SizedBox(width: 8),
-                            Expanded(
-                                child: LinearProgressIndicator(
-                                    value: (e.value / 25).clamp(0.0, 1.0),
-                                    minHeight: 10,
-                                    borderRadius: BorderRadius.circular(12))),
-                            const SizedBox(width: 14),
-                            Text(e.value.toStringAsFixed(0),
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700)),
-                          ])))
-                      .toList())),
+              : Builder(builder: (context) {
+                  final maxEmpHours = byEmployee.values
+                      .fold<double>(8.0, (prev, val) => math.max(prev, val));
+                  return Column(
+                      children: byEmployee.entries
+                          .map((e) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: Row(children: [
+                                SizedBox(
+                                    width:
+                                        MediaQuery.sizeOf(context).width < 420
+                                            ? 100
+                                            : 140,
+                                    child: Text(e.key,
+                                        overflow: TextOverflow.ellipsis)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                    child: LinearProgressIndicator(
+                                        value: (e.value / maxEmpHours)
+                                            .clamp(0.0, 1.0),
+                                        minHeight: 10,
+                                        borderRadius:
+                                            BorderRadius.circular(12))),
+                                const SizedBox(width: 14),
+                                Text('${e.value.toStringAsFixed(2)} hrs',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700)),
+                              ])))
+                          .toList());
+                })),
       const SizedBox(height: 12),
       const Text(
-          'Activity bars show recorded task quantities, not target achievement.',
+          'Activity bars show total recorded time worked in hours.',
           style: TextStyle(color: TaskLogStyle.muted, fontSize: 12)),
     ]);
   }
