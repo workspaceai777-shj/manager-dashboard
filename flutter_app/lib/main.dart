@@ -421,8 +421,9 @@ class _PortalState extends State<Portal> {
       } else {
         qty.putIfAbsent(id, () => TextEditingController()).text =
             row['quantity'].toString();
+        final time = double.tryParse(row['hours'].toString()) ?? 0;
         hours.putIfAbsent(id, () => TextEditingController()).text =
-            row['hours'].toString();
+            (time * 60).round().toString();
       }
     }
     setState(() => savedReportExists = previous.isNotEmpty);
@@ -466,16 +467,16 @@ class _PortalState extends State<Portal> {
     for (final task in tasks) {
       final id = task['id'].toString();
       final qText = (qty[id]?.text ?? '').trim();
-      final hText = (hours[id]?.text ?? '').trim();
+      final mText = (hours[id]?.text ?? '').trim();
       final parsedQ = qText.isEmpty ? 0.0 : (double.tryParse(qText) ?? 0.0);
-      final parsedH = hText.isEmpty ? 0.0 : (double.tryParse(hText) ?? 0.0);
+      final parsedM = mText.isEmpty ? 0.0 : (double.tryParse(mText) ?? 0.0);
       final q = parsedQ < 0 ? 0.0 : parsedQ;
-      final h = parsedH < 0 ? 0.0 : parsedH;
-      if (q > 0 || h > 0) {
+      final m = parsedM < 0 ? 0.0 : parsedM;
+      if (q > 0 || m > 0) {
         data.add({
           'taskId': id,
           'quantity': id == 'collection' ? q : q.round(),
-          'hours': h,
+          'hours': m / 60.0,
         });
       }
     }
@@ -564,7 +565,7 @@ class _PortalState extends State<Portal> {
               fontSize: 27,
               color: TaskLogStyle.ink)),
       const SizedBox(height: 5),
-      const Text('Record quantities and actual time spent on each activity',
+      const Text('Record quantities and total minutes spent on each activity',
           style: TextStyle(color: TaskLogStyle.muted)),
       const SizedBox(height: 20),
       const Text('Activities',
@@ -626,7 +627,7 @@ class _PortalState extends State<Portal> {
                   controller: hours[id],
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Hours'),
+                  decoration: const InputDecoration(labelText: 'Minutes'),
                 );
                 final numberedTitle = Row(
                   crossAxisAlignment: CrossAxisAlignment.start,

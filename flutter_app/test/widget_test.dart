@@ -434,10 +434,10 @@ void main() {
     );
     final hoursField = find.descendant(
       of: ledgerCard,
-      matching: find.widgetWithText(TextField, 'Hours'),
+      matching: find.widgetWithText(TextField, 'Minutes'),
     );
     await tester.enterText(qtyField, '5');
-    await tester.enterText(hoursField, '1.5');
+    await tester.enterText(hoursField, '90');
     await tester.tap(find.text('Save daily report'));
     await tester.pumpAndSettle();
 

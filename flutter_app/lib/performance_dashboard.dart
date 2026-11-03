@@ -33,6 +33,14 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
 
   double num(dynamic x) => double.tryParse(x.toString()) ?? 0;
 
+  String formatDuration(double hoursVal) {
+    final totalMins = (hoursVal * 60).round();
+    if (totalMins < 60) {
+      return '$totalMins min';
+    }
+    return '${hoursVal.toStringAsFixed(2)} hrs';
+  }
+
   List<String> options(String key) {
     final defaults = key == 'branch'
         ? const ['ONT-BB', 'ONT-BR1']
@@ -431,7 +439,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${totalHours.toStringAsFixed(2)} hours',
+                    formatDuration(totalHours),
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 18,
@@ -460,7 +468,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                           ),
                           Expanded(
                             child: Text(
-                              '${e.key.replaceAll('_', ' ')} — ${e.value.toStringAsFixed(1)}h',
+                              e.key.replaceAll('_', ' '),
                               style: const TextStyle(
                                 fontSize: 12.5,
                                 color: TaskLogStyle.ink,
@@ -469,7 +477,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '${e.value.toStringAsFixed(2)}h',
+                            formatDuration(e.value),
                             style: const TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w700,
@@ -649,7 +657,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
             (totals['ledger_updated'] ?? 0).toStringAsFixed(0),
             Icons.edit_document,
             chartColors[0]),
-        tile('Total task hours', totalHours.toStringAsFixed(2), Icons.schedule,
+        tile('Total task time', formatDuration(totalHours), Icons.schedule,
             chartColors[3]),
         tile('Collection (AED)', (totals['collection'] ?? 0).toStringAsFixed(2),
             Icons.account_balance_wallet_outlined, chartColors[2]),
