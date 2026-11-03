@@ -124,7 +124,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
         ])),
       ])));
     return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Row(children:[const Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Row(children:[Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text(widget.isAdmin?'Performance dashboard':'My performance',style:TextStyle(fontSize:26,fontWeight:FontWeight.w800,color:TaskLogStyle.ink)),
         SizedBox(height:5),
         Text('A clear view of daily activity, hours and ledger work',
