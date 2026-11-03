@@ -59,7 +59,7 @@ class _LoginPageState extends State<LoginPage> {
           }, child: const Text('Sign in'))
         ],
       ))),
-    ))),
+    )))),
   );
 }
 
