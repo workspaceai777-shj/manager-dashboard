@@ -688,7 +688,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
               ? const Text('No activity records')
               : Builder(builder: (context) {
                   final maxEmpHours = byEmployee.values
-                      .fold<double>(8.0, (prev, val) => math.max(prev, val));
+                      .fold<double>(10.0, (prev, val) => math.max(prev, val));
                   return Column(
                       children: byEmployee.entries
                           .map((e) => Padding(
@@ -718,7 +718,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                 })),
       const SizedBox(height: 12),
       const Text(
-          'Activity bars show total recorded time worked in hours.',
+          'Activity bars show total recorded time worked out of 10 standard working hours.',
           style: TextStyle(color: TaskLogStyle.muted, fontSize: 12)),
     ]);
   }
