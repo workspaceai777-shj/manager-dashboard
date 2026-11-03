@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'tasklog_style.dart';
@@ -20,6 +21,7 @@ class PerformanceDashboard extends StatefulWidget {
 
 class _PerformanceDashboardState extends State<PerformanceDashboard> {
   String branch = 'ALL', category = 'ALL', employee = 'ALL';
+  DateTime? singleDate;
   DateTimeRange? period;
   bool todayOnly = true;
 
@@ -70,7 +72,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
         if (employee != 'ALL' && e['employeeName'] != employee) {
           return false;
         }
-        if (todayOnly || period != null) {
+        if (todayOnly || singleDate != null || period != null) {
           final d = DateTime.tryParse(e['date'].toString());
           if (todayOnly) {
             final today = DateTime.now();
@@ -78,6 +80,12 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                 d.year == today.year &&
                 d.month == today.month &&
                 d.day == today.day;
+          }
+          if (singleDate != null) {
+            return d != null &&
+                d.year == singleDate!.year &&
+                d.month == singleDate!.month &&
+                d.day == singleDate!.day;
           }
           if (d == null ||
               d.isBefore(period!.start) ||
@@ -91,7 +99,9 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
   Widget picker(String name, String selected, List<String> opts,
           ValueChanged<String?> change) =>
       SizedBox(
-        width: 180,
+        width: MediaQuery.sizeOf(context).width < 620
+            ? (MediaQuery.sizeOf(context).width - 48) / 2
+            : 180,
         child: InputDecorator(
           decoration: InputDecoration(labelText: name, isDense: true),
           child: DropdownButtonHideUnderline(
@@ -194,202 +204,303 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
     ];
     final chart1 = panel(
       'Task quantities',
-      SizedBox(
-        height: 340,
-        child: quantityTasks.isEmpty
-            ? const Center(child: Text('No records for selected filters'))
-            : LayoutBuilder(builder: (context, c) {
-                final compact = c.maxWidth < 400;
-                final visible = quantityTasks.take(9).toList();
-                final chartMaxY = max * 1.18;
-                final leftReserved = compact ? 32.0 : 40.0;
-                const bottomReserved = 74.0;
-                final rodWidth = compact ? 20.0 : 24.0;
-                return Stack(
-                  children: [
-                    BarChart(BarChartData(
-                      alignment: BarChartAlignment.spaceAround,
-                      maxY: chartMaxY,
-                      gridData: const FlGridData(show: false),
-                      borderData: FlBorderData(show: false),
-                      titlesData: FlTitlesData(
-                        topTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
-                        rightTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
-                        leftTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: leftReserved,
-                            maxIncluded: false,
-                          ),
-                        ),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: bottomReserved,
-                            interval: 1,
-                            getTitlesWidget: (value, meta) {
-                              final index = value.toInt();
-                              if (value != index.toDouble() ||
-                                  index < 0 ||
-                                  index >= visible.length) {
-                                return const SizedBox.shrink();
-                              }
-                              final label =
-                                  visible[index].key.replaceAll('_', ' ');
-                              return SideTitleWidget(
-                                meta: meta,
-                                space: 10,
-                                child: SizedBox(
-                                  width: compact ? 52 : 72,
-                                  child: Text(label,
-                                      maxLines: 3,
-                                      overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                          fontSize: 10,
-                                          color: TaskLogStyle.muted,
-                                          height: 1.15)),
+      quantityTasks.isEmpty
+          ? const SizedBox(
+              height: 220,
+              child: Center(child: Text('No records for selected filters')),
+            )
+          : LayoutBuilder(builder: (context, c) {
+              final compact = c.maxWidth < 460;
+              final visible = quantityTasks;
+              final chartMaxY = max * 1.18;
+              final leftReserved = compact ? 32.0 : 40.0;
+              const bottomReserved = 76.0;
+              final rodWidth = compact ? 20.0 : 24.0;
+              final minChartWidth =
+                  leftReserved + visible.length * (compact ? 68.0 : 78.0);
+              final chartWidth = math.max(c.maxWidth, minChartWidth);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: chartWidth,
+                      height: 310,
+                      child: Stack(
+                        children: [
+                          BarChart(BarChartData(
+                            alignment: BarChartAlignment.spaceAround,
+                            maxY: chartMaxY,
+                            gridData: const FlGridData(show: false),
+                            borderData: FlBorderData(show: false),
+                            titlesData: FlTitlesData(
+                              topTitles: const AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false)),
+                              rightTitles: const AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false)),
+                              leftTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: leftReserved,
+                                  maxIncluded: false,
                                 ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                      barGroups: visible
-                          .asMap()
-                          .entries
-                          .map((e) => BarChartGroupData(x: e.key, barRods: [
-                                BarChartRodData(
-                                    toY: e.value.value,
-                                    color: TaskLogStyle.teal,
-                                    width: rodWidth,
-                                    borderRadius: const BorderRadius.vertical(
-                                        top: Radius.circular(7)))
-                              ]))
-                          .toList(),
-                    )),
-                    Positioned(
-                      left: leftReserved,
-                      right: 0,
-                      top: 0,
-                      bottom: bottomReserved,
-                      child: IgnorePointer(
-                        child: LayoutBuilder(
-                          builder: (context, plot) {
-                            final slotWidth = plot.maxWidth / visible.length;
-                            return Stack(
-                              clipBehavior: Clip.none,
-                              children: visible.asMap().entries.map((item) {
-                                final i = item.key;
-                                final value = item.value.value;
-                                final barHeight =
-                                    ((value / chartMaxY) * plot.maxHeight)
-                                        .clamp(0.0, plot.maxHeight);
-                                final qtyText = value % 1 == 0
-                                    ? value.toInt().toString()
-                                    : value.toStringAsFixed(1);
-                                final insideBar = barHeight >= 14;
-                                final barLeft =
-                                    (i + 0.5) * slotWidth - rodWidth / 2;
-                                return Positioned(
-                                  left: barLeft,
-                                  width: rodWidth,
-                                  bottom: insideBar ? 0 : barHeight + 4,
-                                  height: insideBar ? barHeight : 24,
-                                  child: Center(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 2,
-                                        vertical:
-                                            insideBar && barHeight > 20 ? 3 : 1,
-                                      ),
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: RotatedBox(
-                                          quarterTurns: 3,
-                                          child: Text(
-                                            qtyText,
+                              ),
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: bottomReserved,
+                                  interval: 1,
+                                  getTitlesWidget: (value, meta) {
+                                    final index = value.toInt();
+                                    if (value != index.toDouble() ||
+                                        index < 0 ||
+                                        index >= visible.length) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    final label =
+                                        visible[index].key.replaceAll('_', ' ');
+                                    return SideTitleWidget(
+                                      meta: meta,
+                                      space: 10,
+                                      child: SizedBox(
+                                        width: compact ? 62 : 72,
+                                        child: Text(label,
+                                            maxLines: 3,
+                                            overflow: TextOverflow.ellipsis,
                                             textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontSize: compact ? 10.5 : 11.5,
-                                              fontWeight: FontWeight.w800,
-                                              letterSpacing: 0.2,
-                                              color: insideBar
-                                                  ? const Color(0xFF041421)
-                                                  : TaskLogStyle.ink,
-                                              height: 1.0,
+                                            style: const TextStyle(
+                                                fontSize: 10,
+                                                color: TaskLogStyle.muted,
+                                                height: 1.15)),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                            barGroups: visible
+                                .asMap()
+                                .entries
+                                .map((e) => BarChartGroupData(x: e.key, barRods: [
+                                      BarChartRodData(
+                                          toY: e.value.value,
+                                          color: TaskLogStyle.teal,
+                                          width: rodWidth,
+                                          borderRadius:
+                                              const BorderRadius.vertical(
+                                                  top: Radius.circular(7)))
+                                    ]))
+                                .toList(),
+                          )),
+                          Positioned(
+                            left: leftReserved,
+                            right: 0,
+                            top: 0,
+                            bottom: bottomReserved,
+                            child: IgnorePointer(
+                              child: LayoutBuilder(
+                                builder: (context, plot) {
+                                  final slotWidth =
+                                      plot.maxWidth / visible.length;
+                                  return Stack(
+                                    clipBehavior: Clip.none,
+                                    children:
+                                        visible.asMap().entries.map((item) {
+                                      final i = item.key;
+                                      final value = item.value.value;
+                                      final barHeight = ((value / chartMaxY) *
+                                              plot.maxHeight)
+                                          .clamp(0.0, plot.maxHeight);
+                                      final qtyText = value % 1 == 0
+                                          ? value.toInt().toString()
+                                          : value.toStringAsFixed(1);
+                                      final insideBar = barHeight >= 14;
+                                      final barLeft =
+                                          (i + 0.5) * slotWidth - rodWidth / 2;
+                                      return Positioned(
+                                        left: barLeft,
+                                        width: rodWidth,
+                                        bottom: insideBar ? 0 : barHeight + 4,
+                                        height: insideBar ? barHeight : 24,
+                                        child: Center(
+                                          child: Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 2,
+                                              vertical: insideBar &&
+                                                      barHeight > 20
+                                                  ? 3
+                                                  : 1,
+                                            ),
+                                            child: FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              child: RotatedBox(
+                                                quarterTurns: 3,
+                                                child: Text(
+                                                  qtyText,
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    fontSize:
+                                                        compact ? 10.5 : 11.5,
+                                                    fontWeight: FontWeight.w800,
+                                                    letterSpacing: 0.2,
+                                                    color: insideBar
+                                                        ? const Color(
+                                                            0xFF041421)
+                                                        : TaskLogStyle.ink,
+                                                    height: 1.0,
+                                                  ),
+                                                ),
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            );
-                          },
-                        ),
+                                      );
+                                    }).toList(),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                );
-              }),
-      ),
+                  ),
+                  const Divider(height: 20, color: TaskLogStyle.border),
+                  ...visible.map((e) {
+                    final qtyText = e.value % 1 == 0
+                        ? e.value.toInt().toString()
+                        : e.value.toStringAsFixed(1);
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              e.key.replaceAll('_', ' '),
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                color: TaskLogStyle.ink,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            qtyText,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: TaskLogStyle.teal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              );
+            }),
     );
     final chart2 = panel(
       'Time spent by activity',
-      SizedBox(
-        height: 280,
-        child: hourTasks.isEmpty
-            ? const Center(child: Text('No hours recorded'))
-            : LayoutBuilder(builder: (context, c) {
-                final compact = c.maxWidth < 340;
-                return Row(children: [
-                  Expanded(
-                    child: PieChart(PieChartData(
-                      centerSpaceRadius: compact ? 30 : 45,
-                      sections: hourTasks
-                          .take(6)
-                          .toList()
-                          .asMap()
-                          .entries
-                          .map((e) => PieChartSectionData(
-                              value: e.value.value,
-                              color: chartColors[e.key % 6],
-                              radius: compact ? 34 : 44,
-                              showTitle: false))
-                          .toList(),
-                    )),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: compact ? 112 : 160,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('${totalHours.toStringAsFixed(2)} hours',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: compact ? 15 : 18)),
-                        const SizedBox(height: 8),
-                        ...hourTasks.take(5).map((e) => Padding(
-                            padding: const EdgeInsets.only(bottom: 5),
-                            child: Text(
-                                "${e.key.replaceAll('_', ' ')} — ${e.value.toStringAsFixed(1)}h",
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 11)))),
-                      ],
+      hourTasks.isEmpty
+          ? const SizedBox(
+              height: 220,
+              child: Center(child: Text('No hours recorded')),
+            )
+          : LayoutBuilder(builder: (context, c) {
+              final stackVertically = c.maxWidth < 500;
+              final pieWidget = SizedBox(
+                height: stackVertically ? 190 : 240,
+                child: PieChart(PieChartData(
+                  centerSpaceRadius: stackVertically ? 36 : 45,
+                  sections: hourTasks
+                      .asMap()
+                      .entries
+                      .map((e) => PieChartSectionData(
+                          value: e.value.value,
+                          color: chartColors[e.key % chartColors.length],
+                          radius: stackVertically ? 38 : 44,
+                          showTitle: false))
+                      .toList(),
+                )),
+              );
+              final breakdownWidget = Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${totalHours.toStringAsFixed(2)} hours',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
                     ),
                   ),
-                ]);
-              }),
-      ),
+                  const SizedBox(height: 10),
+                  ...hourTasks.asMap().entries.map((entry) {
+                    final e = entry.value;
+                    final color =
+                        chartColors[entry.key % chartColors.length];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4, right: 8),
+                            child: Container(
+                              width: 9,
+                              height: 9,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              '${e.key.replaceAll('_', ' ')} — ${e.value.toStringAsFixed(1)}h',
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                color: TaskLogStyle.ink,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${e.value.toStringAsFixed(2)}h',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: TaskLogStyle.teal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              );
+              if (stackVertically) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    pieWidget,
+                    const SizedBox(height: 16),
+                    breakdownWidget,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(width: 220, child: pieWidget),
+                  const SizedBox(width: 16),
+                  Expanded(child: breakdownWidget),
+                ],
+              );
+            }),
     );
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
@@ -421,37 +532,110 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
         if (widget.isAdmin)
           picker('Employee', employee, options('employeeName'),
               (v) => setState(() => employee = v ?? 'ALL')),
-        FilledButton.tonalIcon(
-            icon: const Icon(Icons.today),
-            onPressed: () => setState(() {
-                  todayOnly = true;
-                  period = null;
-                }),
-            label: Text('Today — ${dateLabel(DateTime.now())}')),
-        OutlinedButton.icon(
-            icon: const Icon(Icons.date_range),
-            onPressed: () async {
-              final v = await showDateRangePicker(
-                  context: context,
-                  firstDate: DateTime(2024),
-                  lastDate: DateTime(2036),
-                  initialDateRange: period);
-              if (v != null) {
-                setState(() {
-                  todayOnly = false;
-                  period = v;
-                });
-              }
-            },
-            label: Text(period == null
-                ? 'Choose date range'
-                : '${dateLabel(period!.start)} – ${dateLabel(period!.end)}')),
-        TextButton(
-            onPressed: () => setState(() {
-                  todayOnly = false;
-                  period = null;
-                }),
-            child: const Text('All loaded dates')),
+        todayOnly
+            ? FilledButton.tonalIcon(
+                icon: const Icon(Icons.today),
+                onPressed: () => setState(() {
+                      todayOnly = true;
+                      singleDate = null;
+                      period = null;
+                    }),
+                label: Text('Today — ${dateLabel(DateTime.now())}'))
+            : OutlinedButton.icon(
+                icon: const Icon(Icons.today),
+                onPressed: () => setState(() {
+                      todayOnly = true;
+                      singleDate = null;
+                      period = null;
+                    }),
+                label: Text('Today — ${dateLabel(DateTime.now())}')),
+        singleDate != null
+            ? FilledButton.tonalIcon(
+                icon: const Icon(Icons.calendar_month),
+                onPressed: () async {
+                  final v = await showDatePicker(
+                      context: context,
+                      initialDate: singleDate ?? DateTime.now(),
+                      firstDate: DateTime(2024),
+                      lastDate: DateTime(2036));
+                  if (v != null) {
+                    setState(() {
+                      todayOnly = false;
+                      singleDate = DateTime(v.year, v.month, v.day);
+                      period = null;
+                    });
+                  }
+                },
+                label: Text('Date — ${dateLabel(singleDate!)}'))
+            : OutlinedButton.icon(
+                icon: const Icon(Icons.calendar_month),
+                onPressed: () async {
+                  final v = await showDatePicker(
+                      context: context,
+                      initialDate: singleDate ?? DateTime.now(),
+                      firstDate: DateTime(2024),
+                      lastDate: DateTime(2036));
+                  if (v != null) {
+                    setState(() {
+                      todayOnly = false;
+                      singleDate = DateTime(v.year, v.month, v.day);
+                      period = null;
+                    });
+                  }
+                },
+                label: const Text('Choose date')),
+        period != null
+            ? FilledButton.tonalIcon(
+                icon: const Icon(Icons.date_range),
+                onPressed: () async {
+                  final v = await showDateRangePicker(
+                      context: context,
+                      firstDate: DateTime(2024),
+                      lastDate: DateTime(2036),
+                      initialDateRange: period);
+                  if (v != null) {
+                    setState(() {
+                      todayOnly = false;
+                      singleDate = null;
+                      period = v;
+                    });
+                  }
+                },
+                label: Text(
+                    '${dateLabel(period!.start)} – ${dateLabel(period!.end)}'))
+            : OutlinedButton.icon(
+                icon: const Icon(Icons.date_range),
+                onPressed: () async {
+                  final v = await showDateRangePicker(
+                      context: context,
+                      firstDate: DateTime(2024),
+                      lastDate: DateTime(2036),
+                      initialDateRange: period);
+                  if (v != null) {
+                    setState(() {
+                      todayOnly = false;
+                      singleDate = null;
+                      period = v;
+                    });
+                  }
+                },
+                label: const Text('Choose date range')),
+        (!todayOnly && singleDate == null && period == null)
+            ? FilledButton.tonalIcon(
+                icon: const Icon(Icons.all_inclusive),
+                onPressed: () => setState(() {
+                      todayOnly = false;
+                      singleDate = null;
+                      period = null;
+                    }),
+                label: const Text('All loaded dates'))
+            : TextButton(
+                onPressed: () => setState(() {
+                      todayOnly = false;
+                      singleDate = null;
+                      period = null;
+                    }),
+                child: const Text('All loaded dates')),
       ]),
       const SizedBox(height: 24),
       Wrap(spacing: 10, runSpacing: 10, children: [
