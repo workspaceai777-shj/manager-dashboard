@@ -214,21 +214,11 @@ class _PortalState extends State<Portal> {
       profile = Map<String, dynamic>.from(b['profile'] ?? {});
       assignments = List.from(b['assignments'] ?? []);
       // A branch/category must be explicitly chosen by normal staff members.
-      // Admins skip the post-login branch selection screen and load their first
-      // assignment automatically.
+      // Admins skip branch selection and open directly on the Dashboard.
       if (profile['role'] == 'ADMIN') {
-        if (!branchSelected) {
-          branchSelected = true;
-          if (assignments.isNotEmpty) {
-            branch = assignments.first['branch'].toString();
-            category = assignments.first['category'].toString();
-            final taskRes = await api.request('tasks', body: {
-              'branch': branch,
-              'category': category,
-            });
-            tasks = List<dynamic>.from(taskRes['tasks'] ?? []);
-            await restoreReport(branch, category, reportDate);
-          }
+        branchSelected = true;
+        if (page != 'Settings') {
+          page = 'Dashboard';
         }
       } else if (!branchSelected) {
         branch = '';
@@ -782,10 +772,10 @@ class _PortalState extends State<Portal> {
 
   Widget responsivePortal(BuildContext context) {
     final narrow = MediaQuery.sizeOf(context).width < 720;
-    final pages = manager
-        ? ['Daily Tasks', 'Dashboard', 'Settings']
-        : ['Daily Tasks', 'My Dashboard'];
-    final index = pages.indexOf(page).clamp(0, pages.length - 1);
+    final pages =
+        manager ? ['Dashboard', 'Settings'] : ['Daily Tasks', 'My Dashboard'];
+    final activePage = pages.contains(page) ? page : pages.first;
+    final index = pages.indexOf(activePage);
     final content = Align(
       alignment: Alignment.topLeft,
       child: SingleChildScrollView(
@@ -797,9 +787,10 @@ class _PortalState extends State<Portal> {
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (error.isNotEmpty)
               Text(error, style: const TextStyle(color: Colors.red)),
-            if (page == 'Daily Tasks') entryPage(),
-            if (page == 'Dashboard' || page == 'My Dashboard') dashboard(),
-            if (page == 'Settings' && manager) AdminSettings(api: api),
+            if (activePage == 'Daily Tasks' && !manager) entryPage(),
+            if (activePage == 'Dashboard' || activePage == 'My Dashboard')
+              dashboard(),
+            if (activePage == 'Settings' && manager) AdminSettings(api: api),
           ]),
         ),
       ),

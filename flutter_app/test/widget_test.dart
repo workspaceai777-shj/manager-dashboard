@@ -405,7 +405,7 @@ void main() {
   });
 
   testWidgets(
-      'Admin Portal shows Daily Tasks, full Dashboard, and Settings across all target widths',
+      'Admin Portal opens directly to full Dashboard and Settings (without Daily Tasks) across all target widths',
       (tester) async {
     final adminApi = FakeStaffApi(
       role: 'ADMIN',
@@ -423,9 +423,11 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      // Admin skips the post-login branch selection screen
+      // Admin skips branch selection and lands directly on the Performance dashboard
       expect(find.text('Select branch and category'), findsNothing);
-      expect(find.text('Daily task report'), findsOneWidget);
+      expect(find.text('Daily Tasks'), findsNothing);
+      expect(find.text('Daily task report'), findsNothing);
+      expect(find.text('Performance dashboard'), findsOneWidget);
 
       expect(find.text('Settings'), findsWidgets);
       await tester.tap(find.byIcon(Icons.settings));
