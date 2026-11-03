@@ -237,7 +237,7 @@ class _PortalState extends State<Portal> {
             profile['role'] == 'ADMIN' ? 'dashboard' : 'myDashboard',
             body: {
               'from': _date(DateTime.now().subtract(const Duration(days: 365))),
-              'to': _date(DateTime.now()),
+              'to': _date(DateTime.now().add(const Duration(days: 7))),
             },
           ))['entries'] ??
           []);
@@ -263,7 +263,7 @@ class _PortalState extends State<Portal> {
         'branch': nextBranch,
         'category': nextCategory,
       });
-      final nextTasks = List<dynamic>.from(response['tasks'] ?? [])
+      var nextTasks = List<dynamic>.from(response['tasks'] ?? [])
           .where((t) => t['id'].toString() != 'accounts_r4_ledgers')
           .map((t) {
         final item = Map<String, dynamic>.from(t as Map);
@@ -272,6 +272,16 @@ class _PortalState extends State<Portal> {
         }
         return item;
       }).toList();
+      if (nextCategory == 'INSURANCE USER' &&
+          !nextTasks.any((t) => t['id'] == 'insurance_claims_prepared')) {
+        nextTasks = [
+          {
+            'id': 'insurance_claims_prepared',
+            'name': 'Insurance Claims Prepared',
+          },
+          ...nextTasks,
+        ];
+      }
       // Fail closed if a stale or mismatched task catalog is received.
       // INSURANCE USER and ACCOUNTS have distinct task ID namespaces.
       if (nextCategory == 'INSURANCE USER' &&
@@ -347,7 +357,7 @@ class _PortalState extends State<Portal> {
         manager ? 'dashboard' : 'myDashboard',
         body: {
           'from': _date(DateTime.now().subtract(const Duration(days: 365))),
-          'to': _date(DateTime.now()),
+          'to': _date(DateTime.now().add(const Duration(days: 7))),
         },
       );
       if (mounted) {
@@ -771,6 +781,11 @@ class _PortalState extends State<Portal> {
 
   Widget dashboard() => PerformanceDashboard(
         records: entries,
+        staffNames: users
+            .map((u) => (u['name'] ?? '').toString().trim())
+            .where((s) => s.isNotEmpty)
+            .toSet()
+            .toList(),
         isAdmin: manager,
         refresh: () async {
           setState(() => loading = true);

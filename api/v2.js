@@ -61,8 +61,13 @@ const bbTasks=[
 ['card_details','Card date/time, therapist and treatment entered'],['ledger_updated','Next-day individual ledgers updated'],
 ['cards_arranged','Next-day cards arranged'],['ledger_prepared','Individual Ledgers Prepared (EMR-wise)']
 ];
-const insurance=[['insurance_invoices','Insurance Invoices Prepared'],['insurance_documents','Insurance Documents Sent'],
-['insurance_datewise','Insurance Datewise Updated'],['insurance_emrwise','Insurance EMRwise Updated']];
+const insurance=[
+  ['insurance_claims_prepared','Insurance Claims Prepared'],
+  ['insurance_invoices','Insurance Invoices Prepared'],
+  ['insurance_documents','Insurance Documents Sent'],
+  ['insurance_datewise','Insurance Datewise Updated'],
+  ['insurance_emrwise','Insurance EMRwise Updated']
+];
 const accounts=[
   ['accounts_collection_check','Daily Collections Checked — White Fox and Ontario'],
   ['accounts_dha_attendance','DHA Attendance Records Updated'],

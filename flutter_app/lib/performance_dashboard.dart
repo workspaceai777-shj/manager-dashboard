@@ -8,10 +8,12 @@ class PerformanceDashboard extends StatefulWidget {
     required this.records,
     required this.refresh,
     required this.isAdmin,
+    this.staffNames = const <String>[],
   });
   final List<dynamic> records;
   final Future<void> Function() refresh;
   final bool isAdmin;
+  final List<String> staffNames;
   @override
   State<PerformanceDashboard> createState() => _PerformanceDashboardState();
 }
@@ -39,7 +41,9 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                 'ACCOUNTS',
                 "DOCTOR'S ZONE",
               ]
-            : const <String>[];
+            : key == 'employeeName'
+                ? widget.staffNames
+                : const <String>[];
     return <String>{
       'ALL',
       ...defaults,
@@ -158,10 +162,10 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
         byEmployee = <String, double>{};
     for (final e in rows) {
       final task = e['taskId'].toString();
+      final name = e['employeeName'].toString();
       totals[task] = (totals[task] ?? 0) + num(e['quantity']);
       hours[task] = (hours[task] ?? 0) + num(e['hours']);
-      if (task == 'ledger_prepared' || task == 'ledger_updated') {
-        final name = e['employeeName'].toString();
+      if (task != 'collection') {
         byEmployee[name] = (byEmployee[name] ?? 0) + num(e['quantity']);
       }
     }

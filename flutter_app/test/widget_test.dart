@@ -35,6 +35,10 @@ class FakeStaffApi extends StaffApi {
   static List<Map<String, String>> catalogFor(String branch, String category) {
     if (category == 'INSURANCE USER') {
       return const [
+        {
+          'id': 'insurance_claims_prepared',
+          'name': 'Insurance Claims Prepared'
+        },
         {'id': 'insurance_invoices', 'name': 'Insurance Invoices Prepared'},
         {'id': 'insurance_documents', 'name': 'Insurance Documents Sent'},
         {'id': 'insurance_datewise', 'name': 'Insurance Datewise Updated'},
