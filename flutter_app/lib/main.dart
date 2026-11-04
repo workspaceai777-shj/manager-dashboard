@@ -6,6 +6,7 @@ import 'api.dart';
 import 'config.dart';
 import 'tasklog_style.dart';
 import 'performance_dashboard.dart';
+import 'staff_detailed_report.dart';
 import 'admin_settings.dart';
 
 void main() async {
@@ -545,6 +546,39 @@ class _PortalState extends State<Portal> {
         'hours': otherM / 60.0,
       });
     }
+    final formattedDate = [
+      reportDate.day.toString().padLeft(2, '0'),
+      reportDate.month.toString().padLeft(2, '0'),
+      reportDate.year.toString(),
+    ].join('/');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.event_available, color: TaskLogStyle.teal),
+            SizedBox(width: 10),
+            Expanded(child: Text('Confirm report date')),
+          ],
+        ),
+        content: Text(
+          'Please confirm the date for which you are saving this daily task report:\n\n'
+          'Date: $formattedDate (${_date(reportDate)})\n'
+          'Section: $branch — $category',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Change date'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Confirm & Save'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     try {
       await api.request('saveReport', body: {
         'branch': branch,
@@ -891,20 +925,48 @@ class _PortalState extends State<Portal> {
     ]);
   }
 
-  Widget dashboard() => PerformanceDashboard(
+  List<String> get _staffNameList => users
+      .where((u) =>
+          (u['role'] ?? '').toString().trim().toUpperCase() != 'ADMIN')
+      .map((u) => (u['name'] ?? '').toString().trim())
+      .where((s) => s.isNotEmpty && s.toLowerCase() != 'administrator')
+      .toSet()
+      .toList();
+
+  Widget dashboard() {
+    final currentUid = (profile['uid'] ?? '').toString().trim();
+    final filteredEntries = entries.where((e) {
+      final empName = (e['employeeName'] ?? '').toString().trim();
+      if (empName.toLowerCase() == 'administrator') return false;
+      if (!manager) {
+        final rowUid = (e['uid'] ?? '').toString().trim();
+        if (currentUid.isNotEmpty && rowUid.isNotEmpty && rowUid != currentUid) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
+    return PerformanceDashboard(
+      records: filteredEntries,
+      staffNames: _staffNameList,
+      isAdmin: manager,
+      currentStaffUid: currentUid,
+      currentStaffName: staffDisplayName,
+      initialDate: reportDate,
+      refresh: () async {
+        setState(() => loading = true);
+        await load();
+      },
+    );
+  }
+
+  Widget detailedReports() => StaffDetailedReport(
         records: entries
             .where((e) =>
                 (e['employeeName'] ?? '').toString().trim().toLowerCase() !=
                 'administrator')
             .toList(),
-        staffNames: users
-            .where((u) =>
-                (u['role'] ?? '').toString().trim().toUpperCase() != 'ADMIN')
-            .map((u) => (u['name'] ?? '').toString().trim())
-            .where((s) => s.isNotEmpty && s.toLowerCase() != 'administrator')
-            .toSet()
-            .toList(),
-        isAdmin: manager,
+        staffNames: _staffNameList,
         refresh: () async {
           setState(() => loading = true);
           await load();
@@ -1017,8 +1079,9 @@ class _PortalState extends State<Portal> {
 
   Widget responsivePortal(BuildContext context) {
     final narrow = MediaQuery.sizeOf(context).width < 720;
-    final pages =
-        manager ? ['Dashboard', 'Settings'] : ['Daily Tasks', 'My Dashboard'];
+    final pages = manager
+        ? ['Dashboard', 'Detailed Reports', 'Settings']
+        : ['Daily Tasks', 'My Dashboard'];
     final activePage = pages.contains(page) ? page : pages.first;
     final index = pages.indexOf(activePage);
     final content = Align(
@@ -1035,11 +1098,18 @@ class _PortalState extends State<Portal> {
             if (activePage == 'Daily Tasks' && !manager) entryPage(),
             if (activePage == 'Dashboard' || activePage == 'My Dashboard')
               dashboard(),
+            if (activePage == 'Detailed Reports' && manager) detailedReports(),
             if (activePage == 'Settings' && manager) AdminSettings(api: api),
           ]),
         ),
       ),
     );
+    IconData navIcon(String p) {
+      if (p == 'Daily Tasks') return Icons.edit_note;
+      if (p == 'Detailed Reports') return Icons.assignment_outlined;
+      if (p == 'Settings') return Icons.settings;
+      return Icons.bar_chart;
+    }
     if (narrow) {
       return Scaffold(
         appBar: AppBar(
@@ -1088,15 +1158,14 @@ class _PortalState extends State<Portal> {
               selectedIndex: index,
               onDestinationSelected: (i) {
                 setState(() => page = pages[i]);
-                if (pages[i].contains('Dashboard')) refreshDashboardData();
+                if (pages[i].contains('Dashboard') ||
+                    pages[i] == 'Detailed Reports') {
+                  refreshDashboardData();
+                }
               },
               destinations: pages
                   .map((p) => NavigationDestination(
-                        icon: Icon(p == 'Daily Tasks'
-                            ? Icons.edit_note
-                            : p == 'Settings'
-                                ? Icons.settings
-                                : Icons.bar_chart),
+                        icon: Icon(navIcon(p)),
                         label: p,
                       ))
                   .toList(),
@@ -1167,17 +1236,16 @@ class _PortalState extends State<Portal> {
               child: TaskLogBrandMark(size: 48)),
           destinations: pages
               .map((p) => NavigationRailDestination(
-                    icon: Icon(p == 'Daily Tasks'
-                        ? Icons.edit_note
-                        : p == 'Settings'
-                            ? Icons.settings
-                            : Icons.bar_chart),
+                    icon: Icon(navIcon(p)),
                     label: Text(p),
                   ))
               .toList(),
           onDestinationSelected: (i) {
             setState(() => page = pages[i]);
-            if (pages[i].contains('Dashboard')) refreshDashboardData();
+            if (pages[i].contains('Dashboard') ||
+                pages[i] == 'Detailed Reports') {
+              refreshDashboardData();
+            }
           },
         ),
         Expanded(child: content),

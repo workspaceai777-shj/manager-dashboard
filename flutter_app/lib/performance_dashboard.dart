@@ -10,11 +10,17 @@ class PerformanceDashboard extends StatefulWidget {
     required this.refresh,
     required this.isAdmin,
     this.staffNames = const <String>[],
+    this.currentStaffUid = '',
+    this.currentStaffName = '',
+    this.initialDate,
   });
   final List<dynamic> records;
   final Future<void> Function() refresh;
   final bool isAdmin;
   final List<String> staffNames;
+  final String currentStaffUid;
+  final String currentStaffName;
+  final DateTime? initialDate;
   @override
   State<PerformanceDashboard> createState() => _PerformanceDashboardState();
 }
@@ -24,6 +30,22 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
   DateTime? singleDate;
   DateTimeRange? period;
   bool todayOnly = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.isAdmin && widget.initialDate != null) {
+      final now = DateTime.now();
+      final d = widget.initialDate!;
+      if (d.year == now.year && d.month == now.month && d.day == now.day) {
+        todayOnly = true;
+        singleDate = null;
+      } else {
+        todayOnly = false;
+        singleDate = DateTime(d.year, d.month, d.day);
+      }
+    }
+  }
 
   String dateLabel(DateTime d) => [
         d.day.toString().padLeft(2, '0'),
@@ -67,9 +89,23 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
   }
 
   List<dynamic> get rows => widget.records.where((e) {
-        if ((e['employeeName'] ?? '').toString().trim().toLowerCase() ==
-            'administrator') {
+        final empName = (e['employeeName'] ?? '').toString().trim();
+        if (empName.toLowerCase() == 'administrator') {
           return false;
+        }
+        if (!widget.isAdmin) {
+          final rowUid = (e['uid'] ?? '').toString().trim();
+          if (widget.currentStaffUid.isNotEmpty &&
+              rowUid.isNotEmpty &&
+              rowUid != widget.currentStaffUid) {
+            return false;
+          }
+          if (widget.currentStaffName.isNotEmpty &&
+              empName.isNotEmpty &&
+              empName.toLowerCase() !=
+                  widget.currentStaffName.trim().toLowerCase()) {
+            return false;
+          }
         }
         if (branch != 'ALL' && e['branch'] != branch) {
           return false;
@@ -79,6 +115,16 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
         }
         if (employee != 'ALL' && e['employeeName'] != employee) {
           return false;
+        }
+        if (!widget.isAdmin) {
+          final d = DateTime.tryParse(e['date'].toString());
+          final targetDay = (!todayOnly && singleDate != null)
+              ? singleDate!
+              : DateTime.now();
+          return d != null &&
+              d.year == targetDay.year &&
+              d.month == targetDay.month &&
+              d.day == targetDay.day;
         }
         if (todayOnly || singleDate != null || period != null) {
           final d = DateTime.tryParse(e['date'].toString());
@@ -448,13 +494,26 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    formatDuration(totalHours),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 18,
-                    ),
-                  ),
+                  if (!widget.isAdmin)
+                    Text(
+                      formatDuration(totalHours),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                      ),
+                    )
+                  else
+                    ...byEmployee.entries.map((emp) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            '${emp.key}: ${formatDuration(emp.value)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              color: TaskLogStyle.teal,
+                            ),
+                          ),
+                        )),
                   const SizedBox(height: 10),
                   ...hourTasks.asMap().entries.map((entry) {
                     final e = entry.value;
@@ -602,58 +661,60 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                   }
                 },
                 label: const Text('Choose date')),
-        period != null
-            ? FilledButton.tonalIcon(
-                icon: const Icon(Icons.date_range),
-                onPressed: () async {
-                  final v = await showDateRangePicker(
-                      context: context,
-                      firstDate: DateTime(2024),
-                      lastDate: DateTime(2036),
-                      initialDateRange: period);
-                  if (v != null) {
-                    setState(() {
-                      todayOnly = false;
-                      singleDate = null;
-                      period = v;
-                    });
-                  }
-                },
-                label: Text(
-                    '${dateLabel(period!.start)} – ${dateLabel(period!.end)}'))
-            : OutlinedButton.icon(
-                icon: const Icon(Icons.date_range),
-                onPressed: () async {
-                  final v = await showDateRangePicker(
-                      context: context,
-                      firstDate: DateTime(2024),
-                      lastDate: DateTime(2036),
-                      initialDateRange: period);
-                  if (v != null) {
-                    setState(() {
-                      todayOnly = false;
-                      singleDate = null;
-                      period = v;
-                    });
-                  }
-                },
-                label: const Text('Choose date range')),
-        (!todayOnly && singleDate == null && period == null)
-            ? FilledButton.tonalIcon(
-                icon: const Icon(Icons.all_inclusive),
-                onPressed: () => setState(() {
-                      todayOnly = false;
-                      singleDate = null;
-                      period = null;
-                    }),
-                label: const Text('All loaded dates'))
-            : TextButton(
-                onPressed: () => setState(() {
-                      todayOnly = false;
-                      singleDate = null;
-                      period = null;
-                    }),
-                child: const Text('All loaded dates')),
+        if (widget.isAdmin) ...[
+          period != null
+              ? FilledButton.tonalIcon(
+                  icon: const Icon(Icons.date_range),
+                  onPressed: () async {
+                    final v = await showDateRangePicker(
+                        context: context,
+                        firstDate: DateTime(2024),
+                        lastDate: DateTime(2036),
+                        initialDateRange: period);
+                    if (v != null) {
+                      setState(() {
+                        todayOnly = false;
+                        singleDate = null;
+                        period = v;
+                      });
+                    }
+                  },
+                  label: Text(
+                      '${dateLabel(period!.start)} – ${dateLabel(period!.end)}'))
+              : OutlinedButton.icon(
+                  icon: const Icon(Icons.date_range),
+                  onPressed: () async {
+                    final v = await showDateRangePicker(
+                        context: context,
+                        firstDate: DateTime(2024),
+                        lastDate: DateTime(2036),
+                        initialDateRange: period);
+                    if (v != null) {
+                      setState(() {
+                        todayOnly = false;
+                        singleDate = null;
+                        period = v;
+                      });
+                    }
+                  },
+                  label: const Text('Choose date range')),
+          (!todayOnly && singleDate == null && period == null)
+              ? FilledButton.tonalIcon(
+                  icon: const Icon(Icons.all_inclusive),
+                  onPressed: () => setState(() {
+                        todayOnly = false;
+                        singleDate = null;
+                        period = null;
+                      }),
+                  label: const Text('All loaded dates'))
+              : TextButton(
+                  onPressed: () => setState(() {
+                        todayOnly = false;
+                        singleDate = null;
+                        period = null;
+                      }),
+                  child: const Text('All loaded dates')),
+        ],
       ]),
       const SizedBox(height: 24),
       Wrap(spacing: 10, runSpacing: 10, children: [
@@ -667,8 +728,20 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
             (totals['ledger_updated'] ?? 0).toStringAsFixed(0),
             Icons.edit_document,
             chartColors[0]),
-        tile('Total task time', formatDuration(totalHours), Icons.schedule,
-            chartColors[3]),
+        if (!widget.isAdmin)
+          tile(
+              'My total time (${(!todayOnly && singleDate != null) ? dateLabel(singleDate!) : dateLabel(DateTime.now())})',
+              formatDuration(totalHours),
+              Icons.schedule,
+              chartColors[3])
+        else if (byEmployee.isEmpty)
+          tile('Staff task time', '0 min', Icons.schedule, chartColors[3])
+        else
+          ...byEmployee.entries.map((emp) => tile(
+              '${emp.key} — Time worked',
+              formatDuration(emp.value),
+              Icons.schedule,
+              chartColors[3])),
         tile('Collection (AED)', (totals['collection'] ?? 0).toStringAsFixed(2),
             Icons.account_balance_wallet_outlined, chartColors[2]),
       ]),

@@ -25,7 +25,7 @@ function sheetClient() {
 const headers = {
   [TAB_USERS]: ['uid','email','name','role','active'],
   [TAB_ASSIGN]: ['uid','branch','category','active'],
-  [TAB_ENTRIES]: ['id','createdAt','uid','employeeName','date','branch','category','taskId','emr','remarks','quantity','hours']
+  [TAB_ENTRIES]: ['id','createdAt','uid','employeeName','date','branch','category','taskId','emr','remarks','quantity','hours','Task Date']
 };
 async function readTab(sheets,tab) {
   try {
@@ -39,6 +39,29 @@ async function readTab(sheets,tab) {
     throw e;
   }
 }
+// Entries carry a dedicated "Task Date" column (the date the work was done, chosen by the
+// staff member) separate from createdAt (when the row was saved). Existing sheets get the
+// header added and their rows back-filled from the legacy `date` column exactly once.
+let taskDateReady=false;
+async function ensureTaskDateColumn(sheets) {
+  if(taskDateReady)return;
+  const head=await sheets.spreadsheets.values.get({spreadsheetId:SHEET_ID,range:`'${TAB_ENTRIES}'!A1:M1`});
+  const cols=(head.data.values||[[]])[0]||[];
+  if(cols[12]!=='Task Date'){
+    const dates=await sheets.spreadsheets.values.get({spreadsheetId:SHEET_ID,range:`'${TAB_ENTRIES}'!E2:E20000`});
+    const col=(dates.data.values||[]).map(r=>[r[0]??'']);
+    await sheets.spreadsheets.values.update({spreadsheetId:SHEET_ID,range:`'${TAB_ENTRIES}'!M1`,
+      valueInputOption:'RAW',requestBody:{values:[['Task Date']]}});
+    if(col.length)await sheets.spreadsheets.values.update({spreadsheetId:SHEET_ID,range:`'${TAB_ENTRIES}'!M2`,
+      valueInputOption:'RAW',requestBody:{values:col}});
+  }
+  taskDateReady=true;
+}
+// Task Date is authoritative for every report/dashboard filter; falls back to legacy date.
+const readEntries=async(sheets)=>(await readTab(sheets,TAB_ENTRIES)).map(r=>{
+  const td=String(r['Task Date']||'').trim();
+  return td?{...r,date:td}:r;
+});
 async function append(sheets,tab,rows) {
   await sheets.spreadsheets.values.append({spreadsheetId:SHEET_ID,range:`'${tab}'!A1`,valueInputOption:'RAW',
     insertDataOption:'INSERT_ROWS',requestBody:{values:rows}});
@@ -184,7 +207,7 @@ export default async function handler(req,res){
     if(body.action==='report'){
       if(!check(body.branch,body.category))return result(res,403,{error:'Category not assigned'});
       if(!validDate(body.date))return result(res,400,{error:'Invalid reporting date'});
-      const all=activeEntries(await readTab(sheets,TAB_ENTRIES));
+      const all=activeEntries(await readEntries(sheets));
       const mine=all.filter(e=>e.uid===uid&&e.branch===body.branch&&
         e.category===body.category&&e.date===body.date);
       return result(res,200,{entries:mine});
@@ -215,12 +238,13 @@ export default async function handler(req,res){
           if(seenLedger.has(ledgerKey))return result(res,400,{error:'Duplicate EMR in submission'});
           seenLedger.add(ledgerKey);
         } else if(emr) return result(res,400,{error:'EMR is only accepted for EMR-wise preparation'});
-        rows.push([crypto.randomUUID(),new Date().toISOString(),uid,me.name,body.date,body.branch,body.category,task,emr,remarks,normalizedQuantity,hours]);
+        rows.push([crypto.randomUUID(),new Date().toISOString(),uid,me.name,body.date,body.branch,body.category,task,emr,remarks,normalizedQuantity,hours,body.date]);
       }
+      await ensureTaskDateColumn(sheets);
       if(body.action==='saveReport'){
         // One append request commits the replacement marker and new records.
         const marker=[crypto.randomUUID(),new Date().toISOString(),uid,me.name,
-          body.date,body.branch,body.category,REPLACE_MARKER,'','',0,0];
+          body.date,body.branch,body.category,REPLACE_MARKER,'','',0,0,body.date];
         await append(sheets,TAB_ENTRIES,[marker,...rows]);
       } else {
         if(rows.length)await append(sheets,TAB_ENTRIES,rows);
@@ -230,7 +254,7 @@ export default async function handler(req,res){
     if(body.action==='dashboard'||body.action==='myDashboard'){
       if(body.action==='dashboard'&&me.role!=='ADMIN')
         return result(res,403,{error:'Administrator access required'});
-      const all=activeEntries(await readTab(sheets,TAB_ENTRIES));
+      const all=activeEntries(await readEntries(sheets));
       const adminUids=new Set(users.filter(u=>u.role==='ADMIN').map(u=>u.uid));
       const from=validDate(body.from)?body.from:'0000-01-01';
       const to=validDate(body.to)?body.to:'9999-12-31';

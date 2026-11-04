@@ -492,6 +492,9 @@ void main() {
     await tester.ensureVisible(find.text('Save daily report'));
     await tester.tap(find.text('Save daily report'));
     await tester.pumpAndSettle();
+    expect(find.text('Confirm report date'), findsOneWidget);
+    await tester.tap(find.text('Confirm & Save'));
+    await tester.pumpAndSettle();
 
     expect(
       find.text(
@@ -504,6 +507,9 @@ void main() {
     await tester.enterText(qtyField, '8');
     await tester.ensureVisible(find.text('Save daily report'));
     await tester.tap(find.text('Save daily report'));
+    await tester.pumpAndSettle();
+    expect(find.text('Confirm report date'), findsOneWidget);
+    await tester.tap(find.text('Confirm & Save'));
     await tester.pumpAndSettle();
 
     // Open My Dashboard and verify total is 8 (not 5 + 8 = 13, and excludes Other Staff's 99)
@@ -518,7 +524,7 @@ void main() {
   });
 
   testWidgets(
-      'Admin Portal opens directly to full Dashboard and Settings (without Daily Tasks) across all target widths',
+      'Admin Portal opens directly to full Dashboard, Detailed Reports, and Settings (without Daily Tasks) across all target widths',
       (tester) async {
     final adminApi = FakeStaffApi(
       role: 'ADMIN',
@@ -541,6 +547,12 @@ void main() {
       expect(find.text('Daily Tasks'), findsNothing);
       expect(find.text('Daily task report'), findsNothing);
       expect(find.text('Performance dashboard'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.assignment_outlined));
+      await tester.pumpAndSettle();
+      expect(find.text('Staff detailed activity reports'), findsOneWidget);
+      expect(find.text('SECTION: FRONT DESK'), findsOneWidget);
+      expect(find.text('Ledgers Updated (R4)'), findsOneWidget);
 
       expect(find.text('Settings'), findsWidgets);
       await tester.tap(find.byIcon(Icons.settings));
