@@ -437,7 +437,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
     return numVal(r['quantity']);
   }
 
-  String _cellText(List<dynamic> rs, String taskId) {
+  String _cellText(List<dynamic> rs, String taskId, {bool compact = false}) {
     if (rs.isEmpty) return '—';
     final q = rs.fold<double>(0, (a, r) => a + numVal(r['quantity']));
     final h = rs.fold<double>(0, (a, r) {
@@ -447,18 +447,22 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
     final time = h > 0 ? formatDuration(h).split(' (').first : '';
     String main;
     if (taskId == 'collection') {
-      main = 'AED ${q.toStringAsFixed(2)}';
+      main = compact ? q.toStringAsFixed(0) : 'AED ${q.toStringAsFixed(2)}';
     } else if (_yesNoTaskIds.contains(taskId)) {
       main = q >= 1 ? 'Yes' : 'No';
     } else if (taskId == 'other_tasks') {
-      main = '';
+      main = compact ? (time.isNotEmpty ? time : 'Done') : '';
     } else if (taskId == 'ledger_prepared') {
-      main = '${rs.length} EMR';
+      main = compact ? '${rs.length}' : '${rs.length} EMR';
     } else {
-      main = 'Qty ${q.toStringAsFixed(0)}';
+      main = compact ? q.toStringAsFixed(0) : 'Qty ${q.toStringAsFixed(0)}';
     }
+    if (compact) return main;
     return [main, time].where((e) => e.isNotEmpty).join(' · ');
   }
+
+  String shortDayLabel(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
 
   /// Activity-by-activity comparison of the last 3 days for each staff member.
   Widget threeDayComparison() {
@@ -488,23 +492,10 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       groups.putIfAbsent(key, () => []).add(e);
     }
     final keys = groups.keys.toList()..sort();
-    const actW = 250.0, dayW = 130.0;
-    Widget cell(String t, {bool head = false, bool strong = false}) => SizedBox(
-          width: dayW,
-          child: Text(t,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: head || strong ? FontWeight.w700 : FontWeight.w500,
-                color: head
-                    ? TaskLogStyle.muted
-                    : (t == '—' ? TaskLogStyle.muted : TaskLogStyle.teal),
-              )),
-        );
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 28),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient:
             const LinearGradient(colors: [Color(0xFF20334F), Color(0xFF132138)]),
@@ -518,7 +509,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           const Text(
-              'Each activity compared day by day for every staff member (quantity · time)',
+              'Each activity compared day by day for every staff member',
               style: TextStyle(color: TaskLogStyle.muted, fontSize: 13)),
           const SizedBox(height: 14),
           if (keys.isEmpty)
@@ -539,7 +530,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
               ];
               return Container(
                 margin: const EdgeInsets.only(bottom: 14),
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: TaskLogStyle.surface.withValues(alpha: 0.85),
                   borderRadius: BorderRadius.circular(14),
@@ -562,52 +553,157 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                               style: const TextStyle(
                                   color: TaskLogStyle.muted, fontSize: 12.5)),
                         ]),
-                    const SizedBox(height: 10),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(children: [
-                            const SizedBox(width: actW),
-                            ...days.map((d) => cell(dateLabel(d), head: true)),
-                          ]),
-                          const Divider(height: 12),
-                          ...ids.map((id) => Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 5),
-                                child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                    const SizedBox(height: 12),
+                    LayoutBuilder(builder: (context, constraints) {
+                      final isMobile = constraints.maxWidth < 600;
+                      if (isMobile) {
+                        const colW = 50.0;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Expanded(
+                                  child: Text('Activity',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: TaskLogStyle.muted,
+                                      )),
+                                ),
+                                ...days.map((d) => SizedBox(
+                                      width: colW,
+                                      child: Text(
+                                        shortDayLabel(d),
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: TaskLogStyle.muted,
+                                        ),
+                                      ),
+                                    )),
+                              ],
+                            ),
+                            const Divider(height: 12),
+                            ...ids.map((id) => Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
-                                      SizedBox(
-                                        width: actW,
-                                        child: Padding(
-                                          padding:
-                                              const EdgeInsets.only(right: 10),
-                                          child: Text(
-                                            activityTitle(
-                                                parts[1], parts[2], id),
-                                            style: const TextStyle(
-                                                fontSize: 12.5,
-                                                fontWeight: FontWeight.w600),
+                                      Expanded(
+                                        child: Text(
+                                          activityTitle(parts[1], parts[2], id),
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: TaskLogStyle.ink,
                                           ),
                                         ),
                                       ),
-                                      ...days.map((d) => cell(_cellText(
-                                          rows
-                                              .where((r) =>
-                                                  r['taskId'] == id &&
-                                                  sameDay(
-                                                      DateTime.tryParse(
-                                                          r['date'].toString()),
-                                                      d))
-                                              .toList(),
-                                          id))),
-                                    ]),
-                              )),
-                        ],
-                      ),
-                    ),
+                                      ...days.map((d) {
+                                        final cellVal = _cellText(
+                                            rows
+                                                .where((r) =>
+                                                    r['taskId'] == id &&
+                                                    sameDay(
+                                                        DateTime.tryParse(r['date']
+                                                            .toString()),
+                                                        d))
+                                                .toList(),
+                                            id,
+                                            compact: true);
+                                        return SizedBox(
+                                          width: colW,
+                                          child: Text(
+                                            cellVal,
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: cellVal == '—'
+                                                  ? FontWeight.w400
+                                                  : FontWeight.w700,
+                                              color: cellVal == '—'
+                                                  ? TaskLogStyle.muted
+                                                  : TaskLogStyle.teal,
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                  ),
+                                )),
+                          ],
+                        );
+                      }
+
+                      // Desktop / Tablet layout
+                      const actW = 250.0, dayW = 125.0;
+                      Widget cell(String t,
+                              {bool head = false, bool strong = false}) =>
+                          SizedBox(
+                            width: dayW,
+                            child: Text(t,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: head || strong
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: head
+                                      ? TaskLogStyle.muted
+                                      : (t == '—'
+                                          ? TaskLogStyle.muted
+                                          : TaskLogStyle.teal),
+                                )),
+                          );
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(children: [
+                              const SizedBox(width: actW),
+                              ...days.map((d) => cell(dateLabel(d), head: true)),
+                            ]),
+                            const Divider(height: 12),
+                            ...ids.map((id) => Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 5),
+                                  child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        SizedBox(
+                                          width: actW,
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(
+                                                right: 10),
+                                            child: Text(
+                                              activityTitle(
+                                                  parts[1], parts[2], id),
+                                              style: const TextStyle(
+                                                  fontSize: 12.5,
+                                                  fontWeight: FontWeight.w600),
+                                            ),
+                                          ),
+                                        ),
+                                        ...days.map((d) => cell(_cellText(
+                                            rows
+                                                .where((r) =>
+                                                    r['taskId'] == id &&
+                                                    sameDay(
+                                                        DateTime.tryParse(r['date']
+                                                            .toString()),
+                                                        d))
+                                                .toList(),
+                                            id))),
+                                      ]),
+                                )),
+                          ],
+                        ),
+                      );
+                    }),
                   ],
                 ),
               );
