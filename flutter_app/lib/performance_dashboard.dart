@@ -227,17 +227,25 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
   Widget build(BuildContext context) {
     final totals = <String, double>{},
         hours = <String, double>{},
-        byEmployee = <String, double>{};
+        byEmployee = <String, double>{},
+        collectionByBranch = <String, double>{};
     final otherRemarks = <String>{};
     for (final e in rows) {
       final task = e['taskId'].toString();
       final name = e['employeeName'].toString();
+      final br = (e['branch'] ?? '').toString().trim();
       // EMR-wise rows are a breakdown of an activity already recorded, so their
       // time is never added to totals; insurance EMR-wise quantity is excluded too.
       final isEmrRow =
           task == 'ledger_prepared' || task == 'insurance_ledger_emr';
       if (task != 'insurance_ledger_emr') {
         totals[task] = (totals[task] ?? 0) + num(e['quantity']);
+      }
+      if (task == 'collection') {
+        if (br.isNotEmpty) {
+          collectionByBranch[br] =
+              (collectionByBranch[br] ?? 0) + num(e['quantity']);
+        }
       }
       if (!isEmrRow) {
         hours[task] = (hours[task] ?? 0) + num(e['hours']);
@@ -745,8 +753,23 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
         else
           ...byEmployee.entries.map((emp) => tile('${emp.key} — Time worked',
               formatDuration(emp.value), Icons.schedule, chartColors[3])),
-        tile('Collection (AED)', (totals['collection'] ?? 0).toStringAsFixed(2),
-            Icons.account_balance_wallet_outlined, chartColors[2]),
+        if (branch != 'ALL')
+          tile('Collection (AED)',
+              (totals['collection'] ?? 0).toStringAsFixed(2),
+              Icons.account_balance_wallet_outlined,
+              chartColors[2])
+        else ...[
+          tile(
+              'Collection — ONT-BB',
+              (collectionByBranch['ONT-BB'] ?? 0).toStringAsFixed(2),
+              Icons.account_balance_wallet_outlined,
+              chartColors[2]),
+          tile(
+              'Collection — ONT-BR1',
+              (collectionByBranch['ONT-BR1'] ?? 0).toStringAsFixed(2),
+              Icons.account_balance_wallet_outlined,
+              chartColors[2]),
+        ],
       ]),
       const SizedBox(height: 20),
       LayoutBuilder(

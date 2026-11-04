@@ -552,7 +552,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Staff detailed activity reports'), findsOneWidget);
       expect(find.text('SECTION: FRONT DESK'), findsOneWidget);
-      expect(find.text('Ledgers Updated (R4)'), findsOneWidget);
+      expect(find.text('Ledgers Updated (R4)'), findsWidgets);
 
       expect(find.text('Settings'), findsWidgets);
       await tester.tap(find.byIcon(Icons.settings));

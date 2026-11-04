@@ -52,10 +52,11 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
         'reminders': 'Next-day WhatsApp reminders sent',
         'billing_excel': 'Billing and daily collection Excel prepared',
         'registration_excel': 'New registration Excel updated',
-        'appointments': 'Appointments, arrival and reporting vouchers',
+        'appointments':
+            'Appointment bookings (in software/excel) & attending calls for appointments',
         'collection': 'Daily collection (AED)',
         'card_details': 'Card date/time, therapist and treatment entered',
-        'patient_cards': 'Treatment Charts & Reporting Vouchers prepared',
+        'patient_cards': 'Arrival, Treatment Charts & Reporting Voucher preparation',
         'charts':
             'Charts prepared for next day including session & rearranged all cards.',
         'cards_arranged':
@@ -82,7 +83,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       'registration_excel': 'Patient Registration Excel updated',
       'ledger_prepared': 'Individual Ledgers Prepared (EMR-wise)',
       'ledger_updated': 'Ledgers Updated (R4)',
-      'patient_cards': 'Treatment Charts & Reporting Vouchers prepared',
+      'patient_cards': 'Arrival, Treatment Charts & Reporting Voucher preparation',
       'charts':
           'Charts prepared for next day including session & rearranged all cards.',
       'cards_arranged':
@@ -436,69 +437,106 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
     return numVal(r['quantity']);
   }
 
+  String _cellText(List<dynamic> rs, String taskId) {
+    if (rs.isEmpty) return '—';
+    final q = rs.fold<double>(0, (a, r) => a + numVal(r['quantity']));
+    final h = rs.fold<double>(0, (a, r) {
+      final id = (r['taskId'] ?? '').toString();
+      return a + (id == 'ledger_prepared' ? 0 : numVal(r['hours']));
+    });
+    final time = h > 0 ? formatDuration(h).split(' (').first : '';
+    String main;
+    if (taskId == 'collection') {
+      main = 'AED ${q.toStringAsFixed(2)}';
+    } else if (_yesNoTaskIds.contains(taskId)) {
+      main = q >= 1 ? 'Yes' : 'No';
+    } else if (taskId == 'other_tasks') {
+      main = '';
+    } else if (taskId == 'ledger_prepared') {
+      main = '${rs.length} EMR';
+    } else {
+      main = 'Qty ${q.toStringAsFixed(0)}';
+    }
+    return [main, time].where((e) => e.isNotEmpty).join(' · ');
+  }
+
+  /// Activity-by-activity comparison of the last 3 days for each staff member.
   Widget threeDayComparison() {
     final today = DateTime.now();
     final days = [
-      for (var i = 0; i < 3; i++)
-        DateTime(today.year, today.month, today.day).subtract(Duration(days: i))
+      for (var i = 2; i >= 0; i--)
+        DateTime(today.year, today.month, today.day)
+            .subtract(Duration(days: i))
     ];
     bool sameDay(DateTime? a, DateTime b) =>
         a != null && a.year == b.year && a.month == b.month && a.day == b.day;
-    final scoped = widget.records.where((e) {
+    final recent = widget.records.where((e) {
       final name = (e['employeeName'] ?? '').toString().trim();
       if (name.toLowerCase() == 'administrator') return false;
       if (branch != 'ALL' && e['branch'] != branch) return false;
       if (category != 'ALL' && e['category'] != category) return false;
       if (employee != 'ALL' && name != employee) return false;
-      return true;
-    });
-    final byStaff = <String, List<dynamic>>{};
-    for (final e in scoped) {
-      byStaff
-          .putIfAbsent((e['employeeName'] ?? '').toString().trim(), () => [])
-          .add(e);
+      final d = DateTime.tryParse(e['date'].toString());
+      if (e['taskId'] == 'insurance_ledger_emr') return false;
+      return days.any((x) => sameDay(d, x));
+    }).toList();
+    // staff | branch | category -> rows
+    final groups = <String, List<dynamic>>{};
+    for (final e in recent) {
+      final key =
+          '${(e['employeeName'] ?? '').toString().trim()}|${e['branch']}|${e['category']}';
+      groups.putIfAbsent(key, () => []).add(e);
     }
-    final names = byStaff.keys.toList()..sort();
+    final keys = groups.keys.toList()..sort();
+    const actW = 250.0, dayW = 130.0;
+    Widget cell(String t, {bool head = false, bool strong = false}) => SizedBox(
+          width: dayW,
+          child: Text(t,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: head || strong ? FontWeight.w700 : FontWeight.w500,
+                color: head
+                    ? TaskLogStyle.muted
+                    : (t == '—' ? TaskLogStyle.muted : TaskLogStyle.teal),
+              )),
+        );
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 28),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-            colors: [Color(0xFF20334F), Color(0xFF132138)]),
+        gradient:
+            const LinearGradient(colors: [Color(0xFF20334F), Color(0xFF132138)]),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: TaskLogStyle.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Last 3 days comparison',
+          const Text('Last 3 days — activity comparison',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          const Text('Task quantity and time consumed per staff member',
+          const Text(
+              'Each activity compared day by day for every staff member (quantity · time)',
               style: TextStyle(color: TaskLogStyle.muted, fontSize: 13)),
           const SizedBox(height: 14),
-          if (names.isEmpty)
-            const Text('No activity records',
+          if (keys.isEmpty)
+            const Text('No activity records in the last 3 days',
                 style: TextStyle(color: TaskLogStyle.muted))
           else
-            ...names.map((name) {
-              final perDay = days.map((d) {
-                final rs = byStaff[name]!.where(
-                    (e) => sameDay(DateTime.tryParse(e['date'].toString()), d));
-                final q = rs.fold<double>(
-                    0,
-                    (a, r) =>
-                        a +
-                        countedQuantity(Map<String, dynamic>.from(r as Map)));
-                final h = rs.fold<double>(
-                    0,
-                    (a, r) =>
-                        a + countedHours(Map<String, dynamic>.from(r as Map)));
-                return (d, q, h);
-              }).toList();
-              final maxH =
-                  perDay.fold<double>(0, (a, e) => e.$3 > a ? e.$3 : a);
+            ...keys.map((key) {
+              final parts = key.split('|');
+              final rows = groups[key]!;
+              final ids = <String>[
+                ...catalogIds(parts[1], parts[2]).where((id) =>
+                    id != 'insurance_ledger_emr' &&
+                    rows.any((r) => r['taskId'] == id)),
+                ...rows
+                    .map((r) => r['taskId'].toString())
+                    .toSet()
+                    .where((id) => !catalogIds(parts[1], parts[2]).contains(id)),
+              ];
               return Container(
                 margin: const EdgeInsets.only(bottom: 14),
                 padding: const EdgeInsets.all(14),
@@ -510,52 +548,66 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(children: [
-                      const Icon(Icons.person,
-                          size: 16, color: TaskLogStyle.teal),
-                      const SizedBox(width: 6),
-                      Text(name,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w800, fontSize: 15)),
-                    ]),
+                    Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          const Icon(Icons.person,
+                              size: 16, color: TaskLogStyle.teal),
+                          Text(parts[0],
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w800, fontSize: 15)),
+                          Text('${parts[1]} — ${parts[2]}',
+                              style: const TextStyle(
+                                  color: TaskLogStyle.muted, fontSize: 12.5)),
+                        ]),
                     const SizedBox(height: 10),
-                    ...perDay.map((e) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 5),
-                          child: Row(children: [
-                            SizedBox(
-                                width: 74,
-                                child: Text(dateLabel(e.$1),
-                                    style: const TextStyle(fontSize: 12.5))),
-                            Expanded(
-                              child: LinearProgressIndicator(
-                                value: maxH <= 0
-                                    ? 0
-                                    : (e.$3 / maxH).clamp(0.0, 1.0),
-                                minHeight: 8,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            SizedBox(
-                              width: 58,
-                              child: Text('Qty: ${e.$2.toStringAsFixed(0)}',
-                                  textAlign: TextAlign.right,
-                                  style: const TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w700)),
-                            ),
-                            SizedBox(
-                              width: 84,
-                              child: Text(
-                                  formatDuration(e.$3).split(' (').first,
-                                  textAlign: TextAlign.right,
-                                  style: const TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: TaskLogStyle.teal)),
-                            ),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(children: [
+                            const SizedBox(width: actW),
+                            ...days.map((d) => cell(dateLabel(d), head: true)),
                           ]),
-                        )),
+                          const Divider(height: 12),
+                          ...ids.map((id) => Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 5),
+                                child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      SizedBox(
+                                        width: actW,
+                                        child: Padding(
+                                          padding:
+                                              const EdgeInsets.only(right: 10),
+                                          child: Text(
+                                            activityTitle(
+                                                parts[1], parts[2], id),
+                                            style: const TextStyle(
+                                                fontSize: 12.5,
+                                                fontWeight: FontWeight.w600),
+                                          ),
+                                        ),
+                                      ),
+                                      ...days.map((d) => cell(_cellText(
+                                          rows
+                                              .where((r) =>
+                                                  r['taskId'] == id &&
+                                                  sameDay(
+                                                      DateTime.tryParse(
+                                                          r['date'].toString()),
+                                                      d))
+                                              .toList(),
+                                          id))),
+                                    ]),
+                              )),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               );
