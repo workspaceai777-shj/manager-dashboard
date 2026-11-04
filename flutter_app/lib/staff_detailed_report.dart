@@ -416,6 +416,14 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
     return out;
   }
 
+  /// EMR-wise rows are a breakdown of an activity already recorded, so their
+  /// time is not added to any total.
+  double countedHours(Map<String, dynamic> r) {
+    final id = (r['taskId'] ?? '').toString();
+    if (id == 'ledger_prepared' || id == 'insurance_ledger_emr') return 0;
+    return numVal(r['hours']);
+  }
+
   /// Task quantity counted for comparison: excludes collection amounts,
   /// yes/no checks and free-text "other task" entries.
   double countedQuantity(Map<String, dynamic> r) {
@@ -483,7 +491,10 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                     (a, r) =>
                         a +
                         countedQuantity(Map<String, dynamic>.from(r as Map)));
-                final h = rs.fold<double>(0, (a, r) => a + numVal(r['hours']));
+                final h = rs.fold<double>(
+                    0,
+                    (a, r) =>
+                        a + countedHours(Map<String, dynamic>.from(r as Map)));
                 return (d, q, h);
               }).toList();
               final maxH =
@@ -511,7 +522,9 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                     ...perDay.map((e) => Padding(
                           padding: const EdgeInsets.symmetric(vertical: 5),
                           child: Row(children: [
-                            SizedBox(width: 74, child: Text(dateLabel(e.$1),
+                            SizedBox(
+                                width: 74,
+                                child: Text(dateLabel(e.$1),
                                     style: const TextStyle(fontSize: 12.5))),
                             Expanded(
                               child: LinearProgressIndicator(
@@ -778,7 +791,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
               });
 
             final sectionTotalHours = sectionRows.fold<double>(
-                0.0, (sum, r) => sum + numVal(r['hours']));
+                0.0, (sum, r) => sum + countedHours(r));
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 28),
@@ -848,7 +861,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                       final formattedDate = formatDateString(rawDate);
                       final brName = (first['branch'] ?? '').toString();
                       final empHours = groupRows.fold<double>(
-                          0.0, (sum, r) => sum + numVal(r['hours']));
+                          0.0, (sum, r) => sum + countedHours(r));
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 16),

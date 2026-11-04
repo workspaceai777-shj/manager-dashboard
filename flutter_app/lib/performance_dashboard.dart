@@ -79,12 +79,10 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
     return <String>{
       'ALL',
       ...defaults.where((v) => v.trim().toLowerCase() != 'administrator'),
-      ...widget.records
-          .map((e) => (e[key] ?? '').toString().trim())
-          .where((v) =>
+      ...widget.records.map((e) => (e[key] ?? '').toString().trim()).where(
+          (v) =>
               v.isNotEmpty &&
-              (key != 'employeeName' ||
-                  v.toLowerCase() != 'administrator')),
+              (key != 'employeeName' || v.toLowerCase() != 'administrator')),
     }.toList();
   }
 
@@ -118,9 +116,8 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
         }
         if (!widget.isAdmin) {
           final d = DateTime.tryParse(e['date'].toString());
-          final targetDay = (!todayOnly && singleDate != null)
-              ? singleDate!
-              : DateTime.now();
+          final targetDay =
+              (!todayOnly && singleDate != null) ? singleDate! : DateTime.now();
           return d != null &&
               d.year == targetDay.year &&
               d.month == targetDay.month &&
@@ -235,9 +232,17 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
     for (final e in rows) {
       final task = e['taskId'].toString();
       final name = e['employeeName'].toString();
-      totals[task] = (totals[task] ?? 0) + num(e['quantity']);
-      hours[task] = (hours[task] ?? 0) + num(e['hours']);
-      byEmployee[name] = (byEmployee[name] ?? 0) + num(e['hours']);
+      // EMR-wise rows are a breakdown of an activity already recorded, so their
+      // time is never added to totals; insurance EMR-wise quantity is excluded too.
+      final isEmrRow =
+          task == 'ledger_prepared' || task == 'insurance_ledger_emr';
+      if (task != 'insurance_ledger_emr') {
+        totals[task] = (totals[task] ?? 0) + num(e['quantity']);
+      }
+      if (!isEmrRow) {
+        hours[task] = (hours[task] ?? 0) + num(e['hours']);
+        byEmployee[name] = (byEmployee[name] ?? 0) + num(e['hours']);
+      }
       if (task == 'other_tasks') {
         final r = (e['remarks'] ?? '').toString().trim();
         if (r.isNotEmpty) otherRemarks.add(r);
@@ -250,6 +255,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
       }
       return base;
     }
+
     final quantityTasks = totals.entries
         .where((e) => e.key != 'collection')
         .toList()
@@ -346,7 +352,8 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                             barGroups: visible
                                 .asMap()
                                 .entries
-                                .map((e) => BarChartGroupData(x: e.key, barRods: [
+                                .map((e) =>
+                                    BarChartGroupData(x: e.key, barRods: [
                                       BarChartRodData(
                                           toY: e.value.value,
                                           color: TaskLogStyle.teal,
@@ -373,9 +380,9 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                                         visible.asMap().entries.map((item) {
                                       final i = item.key;
                                       final value = item.value.value;
-                                      final barHeight = ((value / chartMaxY) *
-                                              plot.maxHeight)
-                                          .clamp(0.0, plot.maxHeight);
+                                      final barHeight =
+                                          ((value / chartMaxY) * plot.maxHeight)
+                                              .clamp(0.0, plot.maxHeight);
                                       final qtyText = value % 1 == 0
                                           ? value.toInt().toString()
                                           : value.toStringAsFixed(1);
@@ -391,10 +398,10 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                                           child: Padding(
                                             padding: EdgeInsets.symmetric(
                                               horizontal: 2,
-                                              vertical: insideBar &&
-                                                      barHeight > 20
-                                                  ? 3
-                                                  : 1,
+                                              vertical:
+                                                  insideBar && barHeight > 20
+                                                      ? 3
+                                                      : 1,
                                             ),
                                             child: FittedBox(
                                               fit: BoxFit.scaleDown,
@@ -517,8 +524,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                   const SizedBox(height: 10),
                   ...hourTasks.asMap().entries.map((entry) {
                     final e = entry.value;
-                    final color =
-                        chartColors[entry.key % chartColors.length];
+                    final color = chartColors[entry.key % chartColors.length];
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
@@ -737,11 +743,8 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
         else if (byEmployee.isEmpty)
           tile('Staff task time', '0 min', Icons.schedule, chartColors[3])
         else
-          ...byEmployee.entries.map((emp) => tile(
-              '${emp.key} — Time worked',
-              formatDuration(emp.value),
-              Icons.schedule,
-              chartColors[3])),
+          ...byEmployee.entries.map((emp) => tile('${emp.key} — Time worked',
+              formatDuration(emp.value), Icons.schedule, chartColors[3])),
         tile('Collection (AED)', (totals['collection'] ?? 0).toStringAsFixed(2),
             Icons.account_balance_wallet_outlined, chartColors[2]),
       ]),
