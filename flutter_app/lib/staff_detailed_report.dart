@@ -29,6 +29,17 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
     'accounts_petty_cash',
     'accounts_month_end',
     'accounts_reception',
+    'accounts_zoho_updation',
+    'accounts_vat_excel_ontario',
+    'accounts_vat_filing_ontario',
+    'accounts_vat_excel_whitefox',
+    'accounts_vat_filing_whitefox',
+    'accounts_cash_in_hand_checking',
+    'accounts_staff_attendance',
+    'accounts_towel_import_invoice',
+    'accounts_medicine_collect_whitefox',
+    'accounts_month_end_closing_deposit',
+    'accounts_whitefox_consignment_sale',
     'room_chore_inspection',
     'daily_collection_billing_done',
   };
@@ -321,7 +332,6 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
           'accounts_collection_check',
           'accounts_dha_attendance',
           'accounts_insurance_ledgers',
-          'accounts_petty_cash',
           'accounts_month_end',
           'accounts_reception',
           'accounts_zoho_updation',
@@ -387,11 +397,18 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
 
   /// Every activity of the section in catalog order; activities the staff member
   /// did not record are shown as "Not entered" so nothing appears to be missing.
+  /// EMR-wise individual ledger entries and other tasks are placed at the end of the section.
   List<Map<String, dynamic>> buildDisplayRows(
       String branch, String category, List<Map<String, dynamic>> recorded) {
+    final catalog = catalogIds(branch, category);
+    final standardCatalog = catalog
+        .where((id) => id != 'ledger_prepared' && id != 'insurance_ledger_emr')
+        .toList();
     final out = <Map<String, dynamic>>[];
     final used = <int>{};
-    for (final id in catalogIds(branch, category)) {
+
+    // 1. Standard catalog activities first
+    for (final id in standardCatalog) {
       var found = false;
       for (var i = 0; i < recorded.length; i++) {
         if ((recorded[i]['taskId'] ?? '').toString() == id) {
@@ -411,8 +428,36 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
         });
       }
     }
+
+    // 2. Extra non-EMR, non-other tasks if any
     for (var i = 0; i < recorded.length; i++) {
-      if (!used.contains(i)) out.add(recorded[i]);
+      if (!used.contains(i)) {
+        final id = (recorded[i]['taskId'] ?? '').toString();
+        if (id != 'ledger_prepared' &&
+            id != 'insurance_ledger_emr' &&
+            id != 'other_tasks') {
+          out.add(recorded[i]);
+          used.add(i);
+        }
+      }
+    }
+
+    // 3. EMR-wise individual ledger entries at the end of all tasks
+    for (var i = 0; i < recorded.length; i++) {
+      if (!used.contains(i)) {
+        final id = (recorded[i]['taskId'] ?? '').toString();
+        if (id == 'ledger_prepared' || id == 'insurance_ledger_emr') {
+          out.add(recorded[i]);
+          used.add(i);
+        }
+      }
+    }
+
+    // 4. Other task carried out at the very end
+    for (var i = 0; i < recorded.length; i++) {
+      if (!used.contains(i)) {
+        out.add(recorded[i]);
+      }
     }
     return out;
   }

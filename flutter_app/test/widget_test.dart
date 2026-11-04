@@ -60,7 +60,6 @@ class FakeStaffApi extends StaffApi {
           'id': 'accounts_insurance_ledgers',
           'name': 'Individual Ledgers for Insurance Updated & Showed'
         },
-        {'id': 'accounts_petty_cash', 'name': 'Petty Cash Filing Completed'},
         {
           'id': 'accounts_month_end',
           'name': 'Month-End Collection Closing and Bank Deposit Handover'
@@ -443,14 +442,15 @@ void main() {
     expect(find.text('R4 Individual Ledgers Created'), findsNothing);
     expect(find.text('Individual Ledgers for Insurance Updated & Showed'),
         findsOneWidget);
+    expect(find.text('Petty Cash Filing Completed'), findsNothing);
     expect(find.text('Zoho updation'), findsOneWidget);
     expect(find.text('Purchase request for one month'), findsOneWidget);
     expect(find.text('Other task carried out'), findsWidgets);
-    for (int i = 1; i <= 21; i++) {
+    for (int i = 1; i <= 20; i++) {
       expect(find.text('$i. '), findsOneWidget);
     }
-    expect(find.widgetWithText(InputDecorator, 'Yes / No'), findsNWidgets(5));
-    expect(find.widgetWithText(TextField, 'Quantity'), findsNWidgets(16));
+    expect(find.widgetWithText(InputDecorator, 'Yes / No'), findsNWidgets(15));
+    expect(find.widgetWithText(TextField, 'Quantity'), findsNWidgets(5));
 
     // Switch to ONT-BB DOCTOR'S ZONE and verify the 3 Doctor's Zone activities
     await tester.tap(find.text('ONT-BR1 — ACCOUNTS'));

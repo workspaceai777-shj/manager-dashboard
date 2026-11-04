@@ -115,7 +115,6 @@ const accounts=[
   ['accounts_collection_check','Daily Collections Checked — White Fox and Ontario'],
   ['accounts_dha_attendance','DHA Attendance Records Updated'],
   ['accounts_insurance_ledgers','Individual Ledgers for Insurance Updated & Showed'],
-  ['accounts_petty_cash','Petty Cash Filing Completed'],
   ['accounts_month_end','Month-End Collection Closing and Bank Deposit Handover'],
   ['accounts_reception','Reception Duties and Reporting Vouchers'],
   ['accounts_zoho_updation','Zoho updation'],
