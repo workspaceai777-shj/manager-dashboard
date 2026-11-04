@@ -175,9 +175,8 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
     return <String>{
       'ALL',
       ...defaults.where((v) => v.trim().toLowerCase() != 'administrator'),
-      ...widget.records
-          .map((e) => (e[key] ?? '').toString().trim())
-          .where((v) =>
+      ...widget.records.map((e) => (e[key] ?? '').toString().trim()).where(
+          (v) =>
               v.isNotEmpty &&
               (key != 'employeeName' || v.toLowerCase() != 'administrator')),
     }.toList();
@@ -299,6 +298,260 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
     return 'Qty: ${q.toStringAsFixed(0)}';
   }
 
+  static List<String> catalogIds(String branch, String category) {
+    switch (category.toUpperCase()) {
+      case "DOCTOR'S ZONE":
+        return const [
+          'doctors_consultations',
+          'doctors_follow_ups',
+          'doctors_treatments_supervised',
+        ];
+      case 'INSURANCE USER':
+        return const [
+          'insurance_claims_prepared',
+          'insurance_invoices',
+          'insurance_documents',
+          'insurance_datewise',
+          'insurance_emrwise',
+          'insurance_ledger_emr',
+        ];
+      case 'ACCOUNTS':
+        return const [
+          'accounts_collection_check',
+          'accounts_dha_attendance',
+          'accounts_insurance_ledgers',
+          'accounts_petty_cash',
+          'accounts_month_end',
+          'accounts_reception',
+          'accounts_zoho_updation',
+          'accounts_vat_excel_ontario',
+          'accounts_vat_filing_ontario',
+          'accounts_vat_excel_whitefox',
+          'accounts_vat_filing_whitefox',
+          'accounts_cash_in_hand_checking',
+          'accounts_staff_attendance',
+          'accounts_towel_import_invoice',
+          'accounts_medicine_collect_whitefox',
+          'accounts_month_end_closing_deposit',
+          'accounts_whitefox_consignment_sale',
+          'accounts_petty_cash_voucher_entry',
+          'accounts_petty_cash_excel',
+          'accounts_monthly_collection_excel',
+          'accounts_purchase_request_month',
+        ];
+    }
+    if (branch == 'ONT-BB') {
+      return const [
+        'registrations',
+        'whatsapp',
+        'therapist_schedule',
+        'reminders',
+        'billing_excel',
+        'registration_excel',
+        'appointments',
+        'collection',
+        'card_details',
+        'patient_cards',
+        'charts',
+        'ledger_updated',
+        'room_chore_inspection',
+        'daily_collection_billing_done',
+        'daily_task_updation',
+        'ledger_prepared',
+      ];
+    }
+    return const [
+      'registrations',
+      'appointments',
+      'calls',
+      'whatsapp',
+      'confirmations',
+      'consultations',
+      'enquiries',
+      'registration_excel',
+      'ledger_prepared',
+      'ledger_updated',
+      'patient_cards',
+      'charts',
+      'patient_documents',
+      'emr_updated',
+      'appointment_excel',
+      'due_checked',
+      'room_chore_inspection',
+      'daily_collection_billing_done',
+      'daily_task_updation',
+      'collection',
+    ];
+  }
+
+  /// Every activity of the section in catalog order; activities the staff member
+  /// did not record are shown as "Not entered" so nothing appears to be missing.
+  List<Map<String, dynamic>> buildDisplayRows(
+      String branch, String category, List<Map<String, dynamic>> recorded) {
+    final out = <Map<String, dynamic>>[];
+    final used = <int>{};
+    for (final id in catalogIds(branch, category)) {
+      var found = false;
+      for (var i = 0; i < recorded.length; i++) {
+        if ((recorded[i]['taskId'] ?? '').toString() == id) {
+          out.add(recorded[i]);
+          used.add(i);
+          found = true;
+        }
+      }
+      if (!found) {
+        out.add({
+          'taskId': id,
+          'branch': branch,
+          'category': category,
+          'quantity': 0,
+          'hours': 0,
+          '_missing': true
+        });
+      }
+    }
+    for (var i = 0; i < recorded.length; i++) {
+      if (!used.contains(i)) out.add(recorded[i]);
+    }
+    return out;
+  }
+
+  /// Task quantity counted for comparison: excludes collection amounts,
+  /// yes/no checks and free-text "other task" entries.
+  double countedQuantity(Map<String, dynamic> r) {
+    final id = (r['taskId'] ?? '').toString();
+    if (id == 'collection' ||
+        id == 'other_tasks' ||
+        _yesNoTaskIds.contains(id)) {
+      return 0;
+    }
+    return numVal(r['quantity']);
+  }
+
+  Widget threeDayComparison() {
+    final today = DateTime.now();
+    final days = [
+      for (var i = 0; i < 3; i++)
+        DateTime(today.year, today.month, today.day).subtract(Duration(days: i))
+    ];
+    bool sameDay(DateTime? a, DateTime b) =>
+        a != null && a.year == b.year && a.month == b.month && a.day == b.day;
+    final scoped = widget.records.where((e) {
+      final name = (e['employeeName'] ?? '').toString().trim();
+      if (name.toLowerCase() == 'administrator') return false;
+      if (branch != 'ALL' && e['branch'] != branch) return false;
+      if (category != 'ALL' && e['category'] != category) return false;
+      if (employee != 'ALL' && name != employee) return false;
+      return true;
+    });
+    final byStaff = <String, List<dynamic>>{};
+    for (final e in scoped) {
+      byStaff
+          .putIfAbsent((e['employeeName'] ?? '').toString().trim(), () => [])
+          .add(e);
+    }
+    final names = byStaff.keys.toList()..sort();
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 28),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+            colors: [Color(0xFF20334F), Color(0xFF132138)]),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: TaskLogStyle.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Last 3 days comparison',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          const Text('Task quantity and time consumed per staff member',
+              style: TextStyle(color: TaskLogStyle.muted, fontSize: 13)),
+          const SizedBox(height: 14),
+          if (names.isEmpty)
+            const Text('No activity records',
+                style: TextStyle(color: TaskLogStyle.muted))
+          else
+            ...names.map((name) {
+              final perDay = days.map((d) {
+                final rs = byStaff[name]!.where(
+                    (e) => sameDay(DateTime.tryParse(e['date'].toString()), d));
+                final q = rs.fold<double>(
+                    0,
+                    (a, r) =>
+                        a +
+                        countedQuantity(Map<String, dynamic>.from(r as Map)));
+                final h = rs.fold<double>(0, (a, r) => a + numVal(r['hours']));
+                return (d, q, h);
+              }).toList();
+              final maxH =
+                  perDay.fold<double>(0, (a, e) => e.$3 > a ? e.$3 : a);
+              return Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: TaskLogStyle.surface.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: TaskLogStyle.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      const Icon(Icons.person,
+                          size: 16, color: TaskLogStyle.teal),
+                      const SizedBox(width: 6),
+                      Text(name,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 15)),
+                    ]),
+                    const SizedBox(height: 10),
+                    ...perDay.map((e) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: Row(children: [
+                            SizedBox(width: 74, child: Text(dateLabel(e.$1),
+                                    style: const TextStyle(fontSize: 12.5))),
+                            Expanded(
+                              child: LinearProgressIndicator(
+                                value: maxH <= 0
+                                    ? 0
+                                    : (e.$3 / maxH).clamp(0.0, 1.0),
+                                minHeight: 8,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            SizedBox(
+                              width: 58,
+                              child: Text('Qty: ${e.$2.toStringAsFixed(0)}',
+                                  textAlign: TextAlign.right,
+                                  style: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700)),
+                            ),
+                            SizedBox(
+                              width: 84,
+                              child: Text(
+                                  formatDuration(e.$3).split(' (').first,
+                                  textAlign: TextAlign.right,
+                                  style: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: TaskLogStyle.teal)),
+                            ),
+                          ]),
+                        )),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final rows = filteredRows;
@@ -337,7 +590,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                   ),
                   SizedBox(height: 5),
                   Text(
-                    'Section-wise, text-wise and activity-wise breakdown of each staff member',
+                    'Section-wise activities and time taken by each staff member, with a 3-day comparison',
                     style: TextStyle(color: TaskLogStyle.muted),
                   ),
                 ],
@@ -481,6 +734,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
           ],
         ),
         const SizedBox(height: 24),
+        threeDayComparison(),
         if (activeSections.isEmpty)
           Container(
             width: double.infinity,
@@ -596,10 +850,6 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                       final empHours = groupRows.fold<double>(
                           0.0, (sum, r) => sum + numVal(r['hours']));
 
-                      final textDescriptions = groupRows
-                          .map((r) => describeRowTextWise(r))
-                          .toList();
-
                       return Container(
                         margin: const EdgeInsets.only(bottom: 16),
                         padding: const EdgeInsets.all(16),
@@ -685,39 +935,6 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                               ],
                             ),
                             const SizedBox(height: 14),
-                            // Text-wise detailed description box
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF132138),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: TaskLogStyle.border),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Text-wise Summary',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: TaskLogStyle.teal,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    '$empName ($brName — $sectionName) on $formattedDate recorded ${groupRows.length} activity item(s) (Total time: ${formatDuration(empHours)}):\n• ${textDescriptions.join('\n• ')}',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      height: 1.45,
-                                      color: TaskLogStyle.ink,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 14),
                             const Text(
                               'Activity-wise Breakdown',
                               style: TextStyle(
@@ -727,19 +944,25 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            ...groupRows.asMap().entries.map((entry) {
+                            ...buildDisplayRows(brName, sectionName, groupRows)
+                                .asMap()
+                                .entries
+                                .map((entry) {
                               final idx = entry.key + 1;
                               final r = entry.value;
                               final taskId = (r['taskId'] ?? '').toString();
                               final title =
                                   activityTitle(brName, sectionName, taskId);
-                              final emr =
-                                  (r['emr'] ?? '').toString().trim();
+                              final emr = (r['emr'] ?? '').toString().trim();
                               final remarks =
                                   (r['remarks'] ?? '').toString().trim();
-                              final qtyStatus = formatQuantityOrStatus(r);
-                              final timeTaken =
-                                  formatDuration(numVal(r['hours']));
+                              final missing = r['_missing'] == true;
+                              final qtyStatus = missing
+                                  ? 'Not entered'
+                                  : formatQuantityOrStatus(r);
+                              final timeTaken = missing
+                                  ? '—'
+                                  : formatDuration(numVal(r['hours']));
 
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 8),
