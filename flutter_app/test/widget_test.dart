@@ -445,8 +445,8 @@ void main() {
     for (int i = 1; i <= 19; i++) {
       expect(find.text('$i. '), findsOneWidget);
     }
-    expect(find.widgetWithText(InputDecorator, 'Yes / No'), findsNWidgets(15));
-    expect(find.widgetWithText(TextField, 'Quantity'), findsNWidgets(4));
+    expect(find.widgetWithText(InputDecorator, 'Yes / No'), findsNWidgets(16));
+    expect(find.widgetWithText(TextField, 'Quantity'), findsNWidgets(3));
 
     // Switch to ONT-BB DOCTOR'S ZONE and verify the 3 Doctor's Zone activities
     await tester.tap(find.text('ONT-BR1 — ACCOUNTS'));

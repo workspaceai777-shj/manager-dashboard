@@ -40,6 +40,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
     'accounts_medicine_collect_whitefox',
     'accounts_month_end_closing_deposit',
     'accounts_whitefox_consignment_sale',
+    'accounts_purchase_request_month',
     'room_chore_inspection',
     'daily_collection_billing_done',
   };
@@ -74,8 +75,6 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
             'Charts prepared for next day including session & rearranged all cards.',
         'ledger_updated': 'Ledger Updated (R4) (including for insurance)',
         'room_chore_inspection': 'Room Chore Inspection',
-        'daily_collection_billing_done':
-            'Daily Collection in Excel & Billing in software Done',
         'daily_task_updation': 'Daily Task Updation',
         'ledger_prepared': 'Individual Ledgers Prepared (EMR-wise)',
       };
@@ -103,8 +102,6 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       'emr_updated': 'EMR Records Updated',
       'due_checked': 'Next Day Appointment Due Checked',
       'room_chore_inspection': 'Room Chore Inspection',
-      'daily_collection_billing_done':
-          'Daily Collection in Excel & Billing in software Done',
       'daily_task_updation': 'Daily Task Updation',
       'collection': 'Daily Collection (AED)',
       // Insurance User
@@ -364,7 +361,6 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
         'charts',
         'ledger_updated',
         'room_chore_inspection',
-        'daily_collection_billing_done',
         'daily_task_updation',
         'ledger_prepared',
       ];
@@ -386,7 +382,6 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       'emr_updated',
       'due_checked',
       'room_chore_inspection',
-      'daily_collection_billing_done',
       'daily_task_updation',
       'collection',
     ];

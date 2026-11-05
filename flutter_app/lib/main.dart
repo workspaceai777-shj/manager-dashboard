@@ -179,6 +179,7 @@ class _PortalState extends State<Portal> {
     'accounts_medicine_collect_whitefox',
     'accounts_month_end_closing_deposit',
     'accounts_whitefox_consignment_sale',
+    'accounts_purchase_request_month',
     'room_chore_inspection',
     'daily_collection_billing_done',
   };

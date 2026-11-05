@@ -81,7 +81,6 @@ const brLedger=[
   ['emr_updated','EMR Records Updated'],
   ['due_checked','Next Day Appointment Due Checked'],
   ['room_chore_inspection','Room Chore Inspection'],
-  ['daily_collection_billing_done','Daily Collection in Excel & Billing in software Done'],
   ['daily_task_updation','Daily Task Updation']
 ];
 const bbTasks=[
@@ -98,7 +97,6 @@ const bbTasks=[
   ['charts','Charts prepared for next day including session & rearranged all cards.'],
   ['ledger_updated','Ledger Updated (R4) (including for insurance)'],
   ['room_chore_inspection','Room Chore Inspection'],
-  ['daily_collection_billing_done','Daily Collection in Excel & Billing in software Done'],
   ['daily_task_updation','Daily Task Updation'],
   ['ledger_prepared','Individual Ledgers Prepared (EMR-wise)']
 ];
