@@ -74,12 +74,11 @@ const baseReception=[
 ];
 const brLedger=[
   ['ledger_prepared','Individual Ledgers Prepared (EMR-wise)'],
-  ['ledger_updated','Ledgers Updated (R4)'],
+  ['ledger_updated','Ledger Updated (R4) (including for insurance)'],
   ['patient_cards','Arrival, Treatment Charts & Reporting Voucher preparation'],
   ['charts','Charts prepared for next day including session & rearranged all cards.'],
-  ['patient_documents','Patient Documents Updated'],
+  ['patient_documents','Patient Doc Folder Updated'],
   ['emr_updated','EMR Records Updated'],
-  ['appointment_excel','Appointment Excel Records Updated'],
   ['due_checked','Next Day Appointment Due Checked'],
   ['room_chore_inspection','Room Chore Inspection'],
   ['daily_collection_billing_done','Daily Collection in Excel & Billing in software Done'],
@@ -97,7 +96,7 @@ const bbTasks=[
   ['card_details','Card date/time, therapist and treatment entered'],
   ['patient_cards','Arrival, Treatment Charts & Reporting Voucher preparation'],
   ['charts','Charts prepared for next day including session & rearranged all cards.'],
-  ['ledger_updated','Next-day individual ledgers updated'],
+  ['ledger_updated','Ledger Updated (R4) (including for insurance)'],
   ['room_chore_inspection','Room Chore Inspection'],
   ['daily_collection_billing_done','Daily Collection in Excel & Billing in software Done'],
   ['daily_task_updation','Daily Task Updation'],
@@ -114,7 +113,7 @@ const insurance=[
 const accounts=[
   ['accounts_collection_check','Daily Collections Checked — White Fox and Ontario'],
   ['accounts_dha_attendance','DHA Attendance Records Updated'],
-  ['accounts_insurance_ledgers','Individual Ledgers for Insurance Updated & Showed'],
+  ['accounts_insurance_ledgers','Individual ledgers for insurance showed'],
   ['accounts_month_end','Month-End Collection Closing and Bank Deposit Handover'],
   ['accounts_reception','Reception Duties and Reporting Vouchers'],
   ['accounts_zoho_updation','Zoho updation'],
@@ -130,7 +129,6 @@ const accounts=[
   ['accounts_whitefox_consignment_sale','White fox Consignment basis sale checking and update'],
   ['accounts_petty_cash_voucher_entry','Petty cash voucher entry and filing'],
   ['accounts_petty_cash_excel','Petty cash excel'],
-  ['accounts_monthly_collection_excel','Monthly collection excel'],
   ['accounts_purchase_request_month','Purchase request for one month']
 ];
 const doctorsZone=[

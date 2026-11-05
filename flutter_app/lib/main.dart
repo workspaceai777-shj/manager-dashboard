@@ -296,7 +296,7 @@ class _PortalState extends State<Portal> {
           .map((t) {
         final item = Map<String, dynamic>.from(t as Map);
         if (item['id'] == 'accounts_insurance_ledgers') {
-          item['name'] = 'Individual Ledgers for Insurance Updated & Showed';
+          item['name'] = 'Individual ledgers for insurance showed';
         }
         return item;
       }).toList();

@@ -72,7 +72,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
             'Charts prepared for next day including session & rearranged all cards.',
         'cards_arranged':
             'Charts prepared for next day including session & rearranged all cards.',
-        'ledger_updated': 'Next-day individual ledgers updated',
+        'ledger_updated': 'Ledger Updated (R4) (including for insurance)',
         'room_chore_inspection': 'Room Chore Inspection',
         'daily_collection_billing_done':
             'Daily Collection in Excel & Billing in software Done',
@@ -93,15 +93,14 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       'enquiries': 'Enquiries Handled',
       'registration_excel': 'Patient Registration Excel updated',
       'ledger_prepared': 'Individual Ledgers Prepared (EMR-wise)',
-      'ledger_updated': 'Ledgers Updated (R4)',
+      'ledger_updated': 'Ledger Updated (R4) (including for insurance)',
       'patient_cards': 'Arrival, Treatment Charts & Reporting Voucher preparation',
       'charts':
           'Charts prepared for next day including session & rearranged all cards.',
       'cards_arranged':
           'Charts prepared for next day including session & rearranged all cards.',
-      'patient_documents': 'Patient Documents Updated',
+      'patient_documents': 'Patient Doc Folder Updated',
       'emr_updated': 'EMR Records Updated',
-      'appointment_excel': 'Appointment Excel Records Updated',
       'due_checked': 'Next Day Appointment Due Checked',
       'room_chore_inspection': 'Room Chore Inspection',
       'daily_collection_billing_done':
@@ -120,7 +119,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
           'Daily Collections Checked — White Fox and Ontario',
       'accounts_dha_attendance': 'DHA Attendance Records Updated',
       'accounts_insurance_ledgers':
-          'Individual Ledgers for Insurance Updated & Showed',
+          'Individual ledgers for insurance showed',
       'accounts_petty_cash': 'Petty Cash Filing Completed',
       'accounts_month_end':
           'Month-End Collection Closing and Bank Deposit Handover',
@@ -347,7 +346,6 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
           'accounts_whitefox_consignment_sale',
           'accounts_petty_cash_voucher_entry',
           'accounts_petty_cash_excel',
-          'accounts_monthly_collection_excel',
           'accounts_purchase_request_month',
         ];
     }
@@ -386,7 +384,6 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       'charts',
       'patient_documents',
       'emr_updated',
-      'appointment_excel',
       'due_checked',
       'room_chore_inspection',
       'daily_collection_billing_done',

@@ -58,7 +58,7 @@ class FakeStaffApi extends StaffApi {
         },
         {
           'id': 'accounts_insurance_ledgers',
-          'name': 'Individual Ledgers for Insurance Updated & Showed'
+          'name': 'Individual ledgers for insurance showed'
         },
         {
           'id': 'accounts_month_end',
@@ -108,10 +108,6 @@ class FakeStaffApi extends StaffApi {
         },
         {'id': 'accounts_petty_cash_excel', 'name': 'Petty cash excel'},
         {
-          'id': 'accounts_monthly_collection_excel',
-          'name': 'Monthly collection excel'
-        },
-        {
           'id': 'accounts_purchase_request_month',
           'name': 'Purchase request for one month'
         },
@@ -134,7 +130,7 @@ class FakeStaffApi extends StaffApi {
           'name': 'New patient registration and cards prepared'
         },
         {'id': 'collection', 'name': 'Daily collection (AED)'},
-        {'id': 'ledger_updated', 'name': 'Next-day individual ledgers updated'},
+        {'id': 'ledger_updated', 'name': 'Ledger Updated (R4) (including for insurance)'},
         {
           'id': 'ledger_prepared',
           'name': 'Individual Ledgers Prepared (EMR-wise)'
@@ -151,7 +147,7 @@ class FakeStaffApi extends StaffApi {
         'id': 'ledger_prepared',
         'name': 'Individual Ledgers Prepared (EMR-wise)'
       },
-      {'id': 'ledger_updated', 'name': 'Ledgers Updated (R4)'},
+      {'id': 'ledger_updated', 'name': 'Ledger Updated (R4) (including for insurance)'},
       {'id': 'collection', 'name': 'Daily Collection (AED)'},
     ];
   }
@@ -433,24 +429,24 @@ void main() {
     expect(find.text('My Dashboard'), findsOneWidget);
     expect(find.text('Settings'), findsNothing);
 
-    // Switch to ONT-BR1 ACCOUNTS and verify 6 activities (R4 Individual Ledgers Created removed,
-    // Individual Ledgers for Insurance Updated & Showed renamed)
+    // Switch to ONT-BR1 ACCOUNTS and verify 19 activities
     await tester.tap(find.text('ONT-BB — FRONT DESK'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('ONT-BR1 — ACCOUNTS').last);
     await tester.pumpAndSettle();
     expect(find.text('R4 Individual Ledgers Created'), findsNothing);
-    expect(find.text('Individual Ledgers for Insurance Updated & Showed'),
+    expect(find.text('Individual ledgers for insurance showed'),
         findsOneWidget);
     expect(find.text('Petty Cash Filing Completed'), findsNothing);
+    expect(find.text('Monthly collection excel'), findsNothing);
     expect(find.text('Zoho updation'), findsOneWidget);
     expect(find.text('Purchase request for one month'), findsOneWidget);
     expect(find.text('Other task carried out'), findsWidgets);
-    for (int i = 1; i <= 20; i++) {
+    for (int i = 1; i <= 19; i++) {
       expect(find.text('$i. '), findsOneWidget);
     }
     expect(find.widgetWithText(InputDecorator, 'Yes / No'), findsNWidgets(15));
-    expect(find.widgetWithText(TextField, 'Quantity'), findsNWidgets(5));
+    expect(find.widgetWithText(TextField, 'Quantity'), findsNWidgets(4));
 
     // Switch to ONT-BB DOCTOR'S ZONE and verify the 3 Doctor's Zone activities
     await tester.tap(find.text('ONT-BR1 — ACCOUNTS'));
@@ -474,9 +470,9 @@ void main() {
             'Patient Registrations (including treatment chart and case sheet)'),
         findsOneWidget);
 
-    // Enter Ledgers Updated (R4) = 5, Hours = 1.5 and save
+    // Enter Ledger Updated (R4) (including for insurance) = 5, Hours = 1.5 and save
     final ledgerCard = find.ancestor(
-      of: find.text('Ledgers Updated (R4)'),
+      of: find.text('Ledger Updated (R4) (including for insurance)'),
       matching: find.byType(Card),
     );
     final qtyField = find.descendant(
@@ -552,7 +548,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Staff detailed activity reports'), findsOneWidget);
       expect(find.text('SECTION: FRONT DESK'), findsOneWidget);
-      expect(find.text('Ledgers Updated (R4)'), findsWidgets);
+      expect(
+          find.text('Ledger Updated (R4) (including for insurance)'), findsWidgets);
 
       expect(find.text('Settings'), findsWidgets);
       await tester.tap(find.byIcon(Icons.settings));
