@@ -348,7 +348,10 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
     }
 
     final quantityTasks = totals.entries
-        .where((e) => e.key != 'collection')
+        .where((e) =>
+            e.key != 'collection' &&
+            e.key != 'ledger_prepared' &&
+            e.key != 'emr_updated')
         .toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     final hourTasks = hours.entries.where((e) => e.value > 0).toList()
@@ -783,11 +786,6 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
       ]),
       const SizedBox(height: 24),
       Wrap(spacing: 10, runSpacing: 10, children: [
-        tile(
-            'New ledgers prepared (EMR-wise)',
-            (totals['ledger_prepared'] ?? 0).toStringAsFixed(0),
-            Icons.menu_book_outlined,
-            chartColors[1]),
         tile(
             'Ledgers updated (R4)',
             (totals['ledger_updated'] ?? 0).toStringAsFixed(0),

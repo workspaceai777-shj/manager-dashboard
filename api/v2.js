@@ -94,7 +94,6 @@ const brLedger=[
   ['patient_cards','Arrival, Treatment Charts & Reporting Voucher preparation'],
   ['charts','Charts prepared for next day including session & rearranged all cards.'],
   ['patient_documents','Patient Doc Folder Updated'],
-  ['emr_updated','EMR Records Updated'],
   ['due_checked','Next Day Appointment Due Checked'],
   ['room_chore_inspection','Room Chore Inspection'],
   ['daily_task_updation','Daily Task Updation']

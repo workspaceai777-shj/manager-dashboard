@@ -267,7 +267,8 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
   List<Map<String, dynamic>> get filteredRows => widget.records
       .where((e) {
         final empName = (e['employeeName'] ?? '').toString().trim();
-        if (empName.toLowerCase() == 'administrator') {
+        if (empName.toLowerCase() == 'administrator' ||
+            e['taskId'] == 'emr_updated') {
           return false;
         }
         if (branch != 'ALL' && e['branch'] != branch) {
@@ -454,7 +455,6 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       'patient_cards',
       'charts',
       'patient_documents',
-      'emr_updated',
       'due_checked',
       'room_chore_inspection',
       'daily_task_updation',
@@ -653,7 +653,10 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       if (category != 'ALL' && e['category'] != category) return false;
       if (employee != 'ALL' && name != employee) return false;
       final d = TaskLogStyle.parseEntryDate(e['Task Date'] ?? e['date']);
-      if (e['taskId'] == 'insurance_ledger_emr') return false;
+      if (e['taskId'] == 'insurance_ledger_emr' ||
+          e['taskId'] == 'emr_updated') {
+        return false;
+      }
       return days.any((x) => sameDay(d, x));
     }).toList();
     // staff | branch | category -> rows
