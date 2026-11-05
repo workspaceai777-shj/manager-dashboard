@@ -573,6 +573,65 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
     return [main, time].where((e) => e.isNotEmpty).join(' · ');
   }
 
+  /// Total time the selected staff member worked each day, across all sections
+  /// and branches (EMR-wise rows excluded to avoid double counting).
+  Widget dailyTotalsCard(List<Map<String, dynamic>> rows) {
+    final byDate = <String, double>{};
+    final sections = <String, Set<String>>{};
+    for (final r in rows) {
+      final raw = TaskLogStyle.parseEntryDate(r['Task Date'] ?? r['date']);
+      final key = raw == null ? '' : TaskLogStyle.dateLabel(raw);
+      byDate[key] = (byDate[key] ?? 0) + countedHours(r);
+      sections
+          .putIfAbsent(key, () => <String>{})
+          .add((r['category'] ?? '').toString());
+    }
+    final dates = byDate.keys.toList()
+      ..sort((a, b) {
+        DateTime p(String s) {
+          final x = s.split('/');
+          return x.length == 3
+              ? DateTime(int.parse(x[2]), int.parse(x[1]), int.parse(x[0]))
+              : DateTime(1970);
+        }
+
+        return p(b).compareTo(p(a));
+      });
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 28),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient:
+            const LinearGradient(colors: [Color(0xFF20334F), Color(0xFF132138)]),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: TaskLogStyle.teal.withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$employee — total time worked (all sections)',
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 10),
+          ...dates.map((d) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(children: [
+                  Expanded(
+                      child: Text(
+                          '$d  •  ${sections[d]!.where((s) => s.isNotEmpty).join(', ')}',
+                          style: const TextStyle(fontSize: 13))),
+                  Text(formatDuration(byDate[d]!),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: TaskLogStyle.teal)),
+                ]),
+              )),
+        ],
+      ),
+    );
+  }
+
   String shortDayLabel(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
 
@@ -981,6 +1040,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
         ),
         const SizedBox(height: 24),
         threeDayComparison(),
+        if (employee != 'ALL' && rows.isNotEmpty) dailyTotalsCard(rows),
         if (activeSections.isEmpty)
           Container(
             width: double.infinity,

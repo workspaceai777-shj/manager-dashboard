@@ -784,12 +784,12 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
       const SizedBox(height: 24),
       Wrap(spacing: 10, runSpacing: 10, children: [
         tile(
-            'Ledgers prepared',
+            'New ledgers prepared (EMR-wise)',
             (totals['ledger_prepared'] ?? 0).toStringAsFixed(0),
             Icons.menu_book_outlined,
             chartColors[1]),
         tile(
-            'Ledgers updated',
+            'Ledgers updated (R4)',
             (totals['ledger_updated'] ?? 0).toStringAsFixed(0),
             Icons.edit_document,
             chartColors[0]),
