@@ -7,21 +7,103 @@ class StaffDetailedReport extends StatefulWidget {
     required this.records,
     required this.refresh,
     this.staffNames = const <String>[],
+    this.branch,
+    this.category,
+    this.employee,
+    this.singleDate,
+    this.period,
+    this.todayOnly,
+    this.onFilterChanged,
   });
 
   final List<dynamic> records;
   final Future<void> Function() refresh;
   final List<String> staffNames;
+  final String? branch;
+  final String? category;
+  final String? employee;
+  final DateTime? singleDate;
+  final DateTimeRange? period;
+  final bool? todayOnly;
+  final void Function({
+    String? branch,
+    String? category,
+    String? employee,
+    DateTime? singleDate,
+    DateTimeRange? period,
+    bool? todayOnly,
+    bool clearDates,
+  })? onFilterChanged;
 
   @override
   State<StaffDetailedReport> createState() => _StaffDetailedReportState();
 }
 
 class _StaffDetailedReportState extends State<StaffDetailedReport> {
-  String branch = 'ALL', category = 'ALL', employee = 'ALL';
-  DateTime? singleDate;
-  DateTimeRange? period;
-  bool todayOnly = true;
+  String _localBranch = 'ALL', _localCategory = 'ALL', _localEmployee = 'ALL';
+  DateTime? _localSingleDate;
+  DateTimeRange? _localPeriod;
+  bool _localTodayOnly = true;
+
+  String get branch => widget.branch ?? _localBranch;
+  String get category => widget.category ?? _localCategory;
+  String get employee => widget.employee ?? _localEmployee;
+  DateTime? get singleDate =>
+      widget.onFilterChanged != null ? widget.singleDate : _localSingleDate;
+  DateTimeRange? get period =>
+      widget.onFilterChanged != null ? widget.period : _localPeriod;
+  bool get todayOnly => widget.todayOnly ?? _localTodayOnly;
+
+  void _setFilter({
+    String? branch,
+    String? category,
+    String? employee,
+    DateTime? singleDate,
+    DateTimeRange? period,
+    bool? todayOnly,
+    bool clearDates = false,
+  }) {
+    if (widget.onFilterChanged != null) {
+      widget.onFilterChanged!(
+        branch: branch,
+        category: category,
+        employee: employee,
+        singleDate: singleDate,
+        period: period,
+        todayOnly: todayOnly,
+        clearDates: clearDates,
+      );
+    } else {
+      setState(() {
+        if (branch != null) _localBranch = branch;
+        if (category != null) _localCategory = category;
+        if (employee != null) _localEmployee = employee;
+        if (clearDates) {
+          _localTodayOnly = false;
+          _localSingleDate = null;
+          _localPeriod = null;
+        } else {
+          if (todayOnly != null) {
+            _localTodayOnly = todayOnly;
+            if (todayOnly) {
+              _localSingleDate = null;
+              _localPeriod = null;
+            }
+          }
+          if (singleDate != null) {
+            _localSingleDate = singleDate;
+            _localTodayOnly = false;
+            _localPeriod = null;
+          }
+          if (period != null) {
+            _localPeriod = period;
+            _localTodayOnly = false;
+            _localSingleDate = null;
+          }
+        }
+      });
+    }
+  }
 
   static const Set<String> _yesNoTaskIds = {
     'accounts_collection_check',
@@ -149,17 +231,9 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
     return generalMap[taskId] ?? taskId.replaceAll('_', ' ');
   }
 
-  String dateLabel(DateTime d) => [
-        d.day.toString().padLeft(2, '0'),
-        d.month.toString().padLeft(2, '0'),
-        d.year.toString()
-      ].join('/');
+  String dateLabel(DateTime d) => TaskLogStyle.dateLabel(d);
 
-  String formatDateString(String raw) {
-    final d = DateTime.tryParse(raw);
-    if (d == null) return raw;
-    return dateLabel(d);
-  }
+  String formatDateString(dynamic raw) => TaskLogStyle.formatDateString(raw);
 
   double numVal(dynamic x) => double.tryParse(x.toString()) ?? 0;
 
@@ -192,8 +266,8 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
 
   List<Map<String, dynamic>> get filteredRows => widget.records
       .where((e) {
-        if ((e['employeeName'] ?? '').toString().trim().toLowerCase() ==
-            'administrator') {
+        final empName = (e['employeeName'] ?? '').toString().trim();
+        if (empName.toLowerCase() == 'administrator') {
           return false;
         }
         if (branch != 'ALL' && e['branch'] != branch) {
@@ -202,29 +276,30 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
         if (category != 'ALL' && e['category'] != category) {
           return false;
         }
-        if (employee != 'ALL' && e['employeeName'] != employee) {
+        if (employee != 'ALL' && empName != employee) {
           return false;
         }
-        if (todayOnly || singleDate != null || period != null) {
-          final d = DateTime.tryParse(e['date'].toString());
-          if (todayOnly) {
-            final today = DateTime.now();
-            return d != null &&
-                d.year == today.year &&
-                d.month == today.month &&
-                d.day == today.day;
-          }
-          if (singleDate != null) {
-            return d != null &&
-                d.year == singleDate!.year &&
-                d.month == singleDate!.month &&
-                d.day == singleDate!.day;
-          }
-          if (d == null ||
-              d.isBefore(period!.start) ||
-              d.isAfter(period!.end)) {
-            return false;
-          }
+        final d = TaskLogStyle.parseEntryDate(e['Task Date'] ?? e['date']);
+        if (singleDate != null) {
+          return d != null &&
+              d.year == singleDate!.year &&
+              d.month == singleDate!.month &&
+              d.day == singleDate!.day;
+        }
+        if (todayOnly) {
+          final today = DateTime.now();
+          return d != null &&
+              d.year == today.year &&
+              d.month == today.month &&
+              d.day == today.day;
+        }
+        if (period != null) {
+          if (d == null) return false;
+          final start = DateTime(
+              period!.start.year, period!.start.month, period!.start.day);
+          final end = DateTime(
+              period!.end.year, period!.end.month, period!.end.day, 23, 59, 59);
+          return !d.isBefore(start) && !d.isAfter(end);
         }
         return true;
       })
@@ -503,10 +578,11 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
 
   /// Activity-by-activity comparison of the last 3 days for each staff member.
   Widget threeDayComparison() {
-    final today = DateTime.now();
+    final anchor = singleDate ??
+        (todayOnly ? DateTime.now() : (period?.end ?? DateTime.now()));
     final days = [
       for (var i = 2; i >= 0; i--)
-        DateTime(today.year, today.month, today.day)
+        DateTime(anchor.year, anchor.month, anchor.day)
             .subtract(Duration(days: i))
     ];
     bool sameDay(DateTime? a, DateTime b) =>
@@ -517,7 +593,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       if (branch != 'ALL' && e['branch'] != branch) return false;
       if (category != 'ALL' && e['category'] != category) return false;
       if (employee != 'ALL' && name != employee) return false;
-      final d = DateTime.tryParse(e['date'].toString());
+      final d = TaskLogStyle.parseEntryDate(e['Task Date'] ?? e['date']);
       if (e['taskId'] == 'insurance_ledger_emr') return false;
       return days.any((x) => sameDay(d, x));
     }).toList();
@@ -644,8 +720,9 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                                                 .where((r) =>
                                                     r['taskId'] == id &&
                                                     sameDay(
-                                                        DateTime.tryParse(r['date']
-                                                            .toString()),
+                                                        TaskLogStyle.parseEntryDate(
+                                                            r['Task Date'] ??
+                                                                r['date']),
                                                         d))
                                                 .toList(),
                                             id,
@@ -730,8 +807,9 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                                                 .where((r) =>
                                                     r['taskId'] == id &&
                                                     sameDay(
-                                                        DateTime.tryParse(r['date']
-                                                            .toString()),
+                                                        TaskLogStyle.parseEntryDate(
+                                                            r['Task Date'] ??
+                                                                r['date']),
                                                         d))
                                                 .toList(),
                                             id))),
@@ -808,28 +886,20 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
           runSpacing: 12,
           children: [
             picker('Branch', branch, options('branch'),
-                (v) => setState(() => branch = v ?? 'ALL')),
+                (v) => _setFilter(branch: v ?? 'ALL')),
             picker('Section', category, options('category'),
-                (v) => setState(() => category = v ?? 'ALL')),
+                (v) => _setFilter(category: v ?? 'ALL')),
             picker('Employee', employee, options('employeeName'),
-                (v) => setState(() => employee = v ?? 'ALL')),
+                (v) => _setFilter(employee: v ?? 'ALL')),
             todayOnly
                 ? FilledButton.tonalIcon(
                     icon: const Icon(Icons.today),
-                    onPressed: () => setState(() {
-                      todayOnly = true;
-                      singleDate = null;
-                      period = null;
-                    }),
+                    onPressed: () => _setFilter(todayOnly: true),
                     label: Text('Today — ${dateLabel(DateTime.now())}'),
                   )
                 : OutlinedButton.icon(
                     icon: const Icon(Icons.today),
-                    onPressed: () => setState(() {
-                      todayOnly = true;
-                      singleDate = null;
-                      period = null;
-                    }),
+                    onPressed: () => _setFilter(todayOnly: true),
                     label: Text('Today — ${dateLabel(DateTime.now())}'),
                   ),
             singleDate != null
@@ -843,11 +913,8 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                         lastDate: DateTime(2036),
                       );
                       if (v != null) {
-                        setState(() {
-                          todayOnly = false;
-                          singleDate = DateTime(v.year, v.month, v.day);
-                          period = null;
-                        });
+                        _setFilter(
+                            singleDate: DateTime(v.year, v.month, v.day));
                       }
                     },
                     label: Text('Date — ${dateLabel(singleDate!)}'),
@@ -862,11 +929,8 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                         lastDate: DateTime(2036),
                       );
                       if (v != null) {
-                        setState(() {
-                          todayOnly = false;
-                          singleDate = DateTime(v.year, v.month, v.day);
-                          period = null;
-                        });
+                        _setFilter(
+                            singleDate: DateTime(v.year, v.month, v.day));
                       }
                     },
                     label: const Text('Choose date'),
@@ -882,11 +946,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                         initialDateRange: period,
                       );
                       if (v != null) {
-                        setState(() {
-                          todayOnly = false;
-                          singleDate = null;
-                          period = v;
-                        });
+                        _setFilter(period: v);
                       }
                     },
                     label: Text(
@@ -902,11 +962,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                         initialDateRange: period,
                       );
                       if (v != null) {
-                        setState(() {
-                          todayOnly = false;
-                          singleDate = null;
-                          period = v;
-                        });
+                        _setFilter(period: v);
                       }
                     },
                     label: const Text('Choose date range'),
@@ -914,19 +970,11 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
             (!todayOnly && singleDate == null && period == null)
                 ? FilledButton.tonalIcon(
                     icon: const Icon(Icons.all_inclusive),
-                    onPressed: () => setState(() {
-                      todayOnly = false;
-                      singleDate = null;
-                      period = null;
-                    }),
+                    onPressed: () => _setFilter(clearDates: true),
                     label: const Text('All loaded dates'),
                   )
                 : TextButton(
-                    onPressed: () => setState(() {
-                      todayOnly = false;
-                      singleDate = null;
-                      period = null;
-                    }),
+                    onPressed: () => _setFilter(clearDates: true),
                     child: const Text('All loaded dates'),
                   ),
           ],

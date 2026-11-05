@@ -13,6 +13,13 @@ class PerformanceDashboard extends StatefulWidget {
     this.currentStaffUid = '',
     this.currentStaffName = '',
     this.initialDate,
+    this.branch,
+    this.category,
+    this.employee,
+    this.singleDate,
+    this.period,
+    this.todayOnly,
+    this.onFilterChanged,
   });
   final List<dynamic> records;
   final Future<void> Function() refresh;
@@ -21,15 +28,91 @@ class PerformanceDashboard extends StatefulWidget {
   final String currentStaffUid;
   final String currentStaffName;
   final DateTime? initialDate;
+  final String? branch;
+  final String? category;
+  final String? employee;
+  final DateTime? singleDate;
+  final DateTimeRange? period;
+  final bool? todayOnly;
+  final void Function({
+    String? branch,
+    String? category,
+    String? employee,
+    DateTime? singleDate,
+    DateTimeRange? period,
+    bool? todayOnly,
+    bool clearDates,
+  })? onFilterChanged;
+
   @override
   State<PerformanceDashboard> createState() => _PerformanceDashboardState();
 }
 
 class _PerformanceDashboardState extends State<PerformanceDashboard> {
-  String branch = 'ALL', category = 'ALL', employee = 'ALL';
-  DateTime? singleDate;
-  DateTimeRange? period;
-  bool todayOnly = true;
+  String _localBranch = 'ALL', _localCategory = 'ALL', _localEmployee = 'ALL';
+  DateTime? _localSingleDate;
+  DateTimeRange? _localPeriod;
+  bool _localTodayOnly = true;
+
+  String get branch => widget.branch ?? _localBranch;
+  String get category => widget.category ?? _localCategory;
+  String get employee => widget.employee ?? _localEmployee;
+  DateTime? get singleDate =>
+      widget.onFilterChanged != null ? widget.singleDate : _localSingleDate;
+  DateTimeRange? get period =>
+      widget.onFilterChanged != null ? widget.period : _localPeriod;
+  bool get todayOnly => widget.todayOnly ?? _localTodayOnly;
+
+  void _setFilter({
+    String? branch,
+    String? category,
+    String? employee,
+    DateTime? singleDate,
+    DateTimeRange? period,
+    bool? todayOnly,
+    bool clearDates = false,
+  }) {
+    if (widget.onFilterChanged != null) {
+      widget.onFilterChanged!(
+        branch: branch,
+        category: category,
+        employee: employee,
+        singleDate: singleDate,
+        period: period,
+        todayOnly: todayOnly,
+        clearDates: clearDates,
+      );
+    } else {
+      setState(() {
+        if (branch != null) _localBranch = branch;
+        if (category != null) _localCategory = category;
+        if (employee != null) _localEmployee = employee;
+        if (clearDates) {
+          _localTodayOnly = false;
+          _localSingleDate = null;
+          _localPeriod = null;
+        } else {
+          if (todayOnly != null) {
+            _localTodayOnly = todayOnly;
+            if (todayOnly) {
+              _localSingleDate = null;
+              _localPeriod = null;
+            }
+          }
+          if (singleDate != null) {
+            _localSingleDate = singleDate;
+            _localTodayOnly = false;
+            _localPeriod = null;
+          }
+          if (period != null) {
+            _localPeriod = period;
+            _localTodayOnly = false;
+            _localSingleDate = null;
+          }
+        }
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -38,20 +121,16 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
       final now = DateTime.now();
       final d = widget.initialDate!;
       if (d.year == now.year && d.month == now.month && d.day == now.day) {
-        todayOnly = true;
-        singleDate = null;
+        _localTodayOnly = true;
+        _localSingleDate = null;
       } else {
-        todayOnly = false;
-        singleDate = DateTime(d.year, d.month, d.day);
+        _localTodayOnly = false;
+        _localSingleDate = DateTime(d.year, d.month, d.day);
       }
     }
   }
 
-  String dateLabel(DateTime d) => [
-        d.day.toString().padLeft(2, '0'),
-        d.month.toString().padLeft(2, '0'),
-        d.year.toString()
-      ].join('/');
+  String dateLabel(DateTime d) => TaskLogStyle.dateLabel(d);
 
   double num(dynamic x) => double.tryParse(x.toString()) ?? 0;
 
@@ -111,11 +190,11 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
         if (category != 'ALL' && e['category'] != category) {
           return false;
         }
-        if (employee != 'ALL' && e['employeeName'] != employee) {
+        if (employee != 'ALL' && empName != employee) {
           return false;
         }
+        final d = TaskLogStyle.parseEntryDate(e['Task Date'] ?? e['date']);
         if (!widget.isAdmin) {
-          final d = DateTime.tryParse(e['date'].toString());
           final targetDay =
               (!todayOnly && singleDate != null) ? singleDate! : DateTime.now();
           return d != null &&
@@ -123,26 +202,27 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
               d.month == targetDay.month &&
               d.day == targetDay.day;
         }
-        if (todayOnly || singleDate != null || period != null) {
-          final d = DateTime.tryParse(e['date'].toString());
-          if (todayOnly) {
-            final today = DateTime.now();
-            return d != null &&
-                d.year == today.year &&
-                d.month == today.month &&
-                d.day == today.day;
-          }
-          if (singleDate != null) {
-            return d != null &&
-                d.year == singleDate!.year &&
-                d.month == singleDate!.month &&
-                d.day == singleDate!.day;
-          }
-          if (d == null ||
-              d.isBefore(period!.start) ||
-              d.isAfter(period!.end)) {
-            return false;
-          }
+        // Strict date filtering: when singleDate is chosen, match only that date
+        if (singleDate != null) {
+          return d != null &&
+              d.year == singleDate!.year &&
+              d.month == singleDate!.month &&
+              d.day == singleDate!.day;
+        }
+        if (todayOnly) {
+          final today = DateTime.now();
+          return d != null &&
+              d.year == today.year &&
+              d.month == today.month &&
+              d.day == today.day;
+        }
+        if (period != null) {
+          if (d == null) return false;
+          final start = DateTime(
+              period!.start.year, period!.start.month, period!.start.day);
+          final end = DateTime(
+              period!.end.year, period!.end.month, period!.end.day, 23, 59, 59);
+          return !d.isBefore(start) && !d.isAfter(end);
         }
         return true;
       }).toList();
@@ -238,7 +318,10 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
       // time is never added to totals; insurance EMR-wise quantity is excluded too.
       final isEmrRow =
           task == 'ledger_prepared' || task == 'insurance_ledger_emr';
-      if (task != 'insurance_ledger_emr') {
+      if (task == 'ledger_prepared') {
+        final q = num(e['quantity']);
+        totals[task] = (totals[task] ?? 0) + (q > 0 ? q : 1);
+      } else if (task != 'insurance_ledger_emr') {
         totals[task] = (totals[task] ?? 0) + num(e['quantity']);
       }
       if (task == 'collection') {
@@ -257,7 +340,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
       }
     }
     String formatTaskLabel(String key) {
-      final base = key.replaceAll('_', ' ');
+      final base = TaskLogStyle.activityTitle(branch, category, key);
       if (key == 'other_tasks' && otherRemarks.isNotEmpty) {
         return '$base (${otherRemarks.join('; ')})';
       }
@@ -617,28 +700,20 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
       const SizedBox(height: 24),
       Wrap(spacing: 12, runSpacing: 12, children: [
         picker('Branch', branch, options('branch'),
-            (v) => setState(() => branch = v ?? 'ALL')),
+            (v) => _setFilter(branch: v ?? 'ALL')),
         picker('Category', category, options('category'),
-            (v) => setState(() => category = v ?? 'ALL')),
+            (v) => _setFilter(category: v ?? 'ALL')),
         if (widget.isAdmin)
           picker('Employee', employee, options('employeeName'),
-              (v) => setState(() => employee = v ?? 'ALL')),
+              (v) => _setFilter(employee: v ?? 'ALL')),
         todayOnly
             ? FilledButton.tonalIcon(
                 icon: const Icon(Icons.today),
-                onPressed: () => setState(() {
-                      todayOnly = true;
-                      singleDate = null;
-                      period = null;
-                    }),
+                onPressed: () => _setFilter(todayOnly: true),
                 label: Text('Today — ${dateLabel(DateTime.now())}'))
             : OutlinedButton.icon(
                 icon: const Icon(Icons.today),
-                onPressed: () => setState(() {
-                      todayOnly = true;
-                      singleDate = null;
-                      period = null;
-                    }),
+                onPressed: () => _setFilter(todayOnly: true),
                 label: Text('Today — ${dateLabel(DateTime.now())}')),
         singleDate != null
             ? FilledButton.tonalIcon(
@@ -650,11 +725,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                       firstDate: DateTime(2024),
                       lastDate: DateTime(2036));
                   if (v != null) {
-                    setState(() {
-                      todayOnly = false;
-                      singleDate = DateTime(v.year, v.month, v.day);
-                      period = null;
-                    });
+                    _setFilter(singleDate: DateTime(v.year, v.month, v.day));
                   }
                 },
                 label: Text('Date — ${dateLabel(singleDate!)}'))
@@ -667,11 +738,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                       firstDate: DateTime(2024),
                       lastDate: DateTime(2036));
                   if (v != null) {
-                    setState(() {
-                      todayOnly = false;
-                      singleDate = DateTime(v.year, v.month, v.day);
-                      period = null;
-                    });
+                    _setFilter(singleDate: DateTime(v.year, v.month, v.day));
                   }
                 },
                 label: const Text('Choose date')),
@@ -686,11 +753,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                         lastDate: DateTime(2036),
                         initialDateRange: period);
                     if (v != null) {
-                      setState(() {
-                        todayOnly = false;
-                        singleDate = null;
-                        period = v;
-                      });
+                      _setFilter(period: v);
                     }
                   },
                   label: Text(
@@ -704,29 +767,17 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                         lastDate: DateTime(2036),
                         initialDateRange: period);
                     if (v != null) {
-                      setState(() {
-                        todayOnly = false;
-                        singleDate = null;
-                        period = v;
-                      });
+                      _setFilter(period: v);
                     }
                   },
                   label: const Text('Choose date range')),
           (!todayOnly && singleDate == null && period == null)
               ? FilledButton.tonalIcon(
                   icon: const Icon(Icons.all_inclusive),
-                  onPressed: () => setState(() {
-                        todayOnly = false;
-                        singleDate = null;
-                        period = null;
-                      }),
+                  onPressed: () => _setFilter(clearDates: true),
                   label: const Text('All loaded dates'))
               : TextButton(
-                  onPressed: () => setState(() {
-                        todayOnly = false;
-                        singleDate = null;
-                        period = null;
-                      }),
+                  onPressed: () => _setFilter(clearDates: true),
                   child: const Text('All loaded dates')),
         ],
       ]),
@@ -750,9 +801,13 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
               chartColors[3])
         else if (byEmployee.isEmpty)
           tile('Staff task time', '0 min', Icons.schedule, chartColors[3])
-        else
+        else ...[
+          if (byEmployee.length > 1)
+            tile('Total staff time', formatDuration(totalHours),
+                Icons.timer_outlined, chartColors[3]),
           ...byEmployee.entries.map((emp) => tile('${emp.key} — Time worked',
               formatDuration(emp.value), Icons.schedule, chartColors[3])),
+        ],
         if (branch != 'ALL')
           tile('Collection (AED)',
               (totals['collection'] ?? 0).toStringAsFixed(2),

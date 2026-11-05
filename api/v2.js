@@ -57,10 +57,26 @@ async function ensureTaskDateColumn(sheets) {
   }
   taskDateReady=true;
 }
+function normalizeEntryDate(value) {
+  const s = String(value || '').trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (m) {
+    const d = String(m[1]).padStart(2, '0');
+    const mo = String(m[2]).padStart(2, '0');
+    const y = m[3];
+    return `${y}-${mo}-${d}`;
+  }
+  return s;
+}
+
 // Task Date is authoritative for every report/dashboard filter; falls back to legacy date.
 const readEntries=async(sheets)=>(await readTab(sheets,TAB_ENTRIES)).map(r=>{
-  const td=String(r['Task Date']||'').trim();
-  return td?{...r,date:td}:r;
+  const td = normalizeEntryDate(r['Task Date']);
+  const d = normalizeEntryDate(r.date);
+  const effective = td || d;
+  return effective ? {...r, date: effective, 'Task Date': td || effective} : r;
 });
 async function append(sheets,tab,rows) {
   await sheets.spreadsheets.values.append({spreadsheetId:SHEET_ID,range:`'${tab}'!A1`,valueInputOption:'RAW',

@@ -203,6 +203,51 @@ class _PortalState extends State<Portal> {
       newUserName = TextEditingController(),
       newUserUid = TextEditingController();
   String newUserBranch = 'ONT-BB', newUserCategory = 'FRONT DESK';
+  String adminBranch = 'ALL';
+  String adminCategory = 'ALL';
+  String adminEmployee = 'ALL';
+  DateTime? adminSingleDate;
+  DateTimeRange? adminPeriod;
+  bool adminTodayOnly = true;
+
+  void _onAdminFilterChanged({
+    String? branch,
+    String? category,
+    String? employee,
+    DateTime? singleDate,
+    DateTimeRange? period,
+    bool? todayOnly,
+    bool clearDates = false,
+  }) {
+    setState(() {
+      if (branch != null) adminBranch = branch;
+      if (category != null) adminCategory = category;
+      if (employee != null) adminEmployee = employee;
+      if (clearDates) {
+        adminTodayOnly = false;
+        adminSingleDate = null;
+        adminPeriod = null;
+      } else {
+        if (todayOnly != null) {
+          adminTodayOnly = todayOnly;
+          if (todayOnly) {
+            adminSingleDate = null;
+            adminPeriod = null;
+          }
+        }
+        if (singleDate != null) {
+          adminSingleDate = singleDate;
+          adminTodayOnly = false;
+          adminPeriod = null;
+        }
+        if (period != null) {
+          adminPeriod = period;
+          adminTodayOnly = false;
+          adminSingleDate = null;
+        }
+      }
+    });
+  }
 
   String? get emrTaskId {
     if (tasks.any((t) => t['id'] == 'ledger_prepared')) {
@@ -965,6 +1010,13 @@ class _PortalState extends State<Portal> {
       currentStaffUid: currentUid,
       currentStaffName: staffDisplayName,
       initialDate: reportDate,
+      branch: manager ? adminBranch : null,
+      category: manager ? adminCategory : null,
+      employee: manager ? adminEmployee : null,
+      singleDate: manager ? adminSingleDate : null,
+      period: manager ? adminPeriod : null,
+      todayOnly: manager ? adminTodayOnly : null,
+      onFilterChanged: manager ? _onAdminFilterChanged : null,
       refresh: () async {
         setState(() => loading = true);
         await load();
@@ -979,6 +1031,13 @@ class _PortalState extends State<Portal> {
                 'administrator')
             .toList(),
         staffNames: _staffNameList,
+        branch: adminBranch,
+        category: adminCategory,
+        employee: adminEmployee,
+        singleDate: adminSingleDate,
+        period: adminPeriod,
+        todayOnly: adminTodayOnly,
+        onFilterChanged: _onAdminFilterChanged,
         refresh: () async {
           setState(() => loading = true);
           await load();

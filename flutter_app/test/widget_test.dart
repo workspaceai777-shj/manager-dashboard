@@ -562,4 +562,66 @@ void main() {
     tester.view.resetDevicePixelRatio();
     await tester.binding.setSurfaceSize(null);
   });
+
+  testWidgets(
+      'Admin filter state is shared between Dashboard and Detailed Reports and strictly filters by date',
+      (tester) async {
+    final adminApi = FakeStaffApi(
+      role: 'ADMIN',
+      uid: 'admin-1',
+      name: 'Clinic Admin',
+    );
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    final yesterdayStr =
+        '${yesterday.year.toString().padLeft(4, "0")}-${yesterday.month.toString().padLeft(2, "0")}-${yesterday.day.toString().padLeft(2, "0")}';
+    adminApi.allEntries.add({
+      'uid': 'staff-1',
+      'employeeName': 'Prince',
+      'date': yesterdayStr,
+      'branch': 'ONT-BR1',
+      'category': 'FRONT DESK',
+      'taskId': 'ledger_updated',
+      'emr': '',
+      'remarks': '',
+      'quantity': 12,
+      'hours': 2.0,
+      'Task Date': yesterdayStr,
+    });
+
+    await tester.binding.setSurfaceSize(const Size(1280, 900));
+    await tester.pumpWidget(MaterialApp(
+      theme: TaskLogStyle.dark,
+      home: Portal(key: const ValueKey('admin-filter-test'), api: adminApi),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Performance dashboard'), findsOneWidget);
+
+    // Switch Branch to ONT-BR1 on Dashboard
+    await tester.tap(find.byKey(const ValueKey('BranchALL')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ONT-BR1').last);
+    await tester.pumpAndSettle();
+
+    // Switch to Detailed Reports
+    await tester.tap(find.byIcon(Icons.assignment_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('Staff detailed activity reports'), findsOneWidget);
+
+    // Verify Detailed Reports has inherited ONT-BR1!
+    expect(find.byKey(const ValueKey('detail-Branch-ONT-BR1')), findsOneWidget);
+
+    // Change Section in Detailed Reports to FRONT DESK
+    await tester.tap(find.byKey(const ValueKey('detail-Section-ALL')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FRONT DESK').last);
+    await tester.pumpAndSettle();
+
+    // Switch back to Dashboard and verify Section is now FRONT DESK
+    await tester.tap(find.byIcon(Icons.bar_chart));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('CategoryFRONT DESK')), findsOneWidget);
+
+    await tester.binding.setSurfaceSize(null);
+  });
 }
