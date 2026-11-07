@@ -687,6 +687,62 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
               'Each activity compared day by day for every staff member',
               style: TextStyle(color: TaskLogStyle.muted, fontSize: 13)),
           const SizedBox(height: 14),
+          if (recent.isNotEmpty) ...[
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: days.map((d) {
+                final dayRows = recent.where((r) => sameDay(
+                    TaskLogStyle.parseEntryDate(r['Task Date'] ?? r['date']),
+                    d));
+                final totalH = dayRows.fold<double>(
+                    0.0,
+                    (sum, r) =>
+                        sum +
+                        countedHours(Map<String, dynamic>.from(r as Map)));
+                final timeText = totalH > 0
+                    ? formatDuration(totalH).split(' (').first
+                    : '0 min';
+                return Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: TaskLogStyle.surface.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: TaskLogStyle.teal.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.schedule,
+                          size: 14, color: TaskLogStyle.teal),
+                      const SizedBox(width: 5),
+                      Text(
+                        shortDayLabel(d),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: TaskLogStyle.ink,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        timeText,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: TaskLogStyle.teal,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 18),
+          ],
           if (keys.isEmpty)
             const Text('No activity records in the last 3 days',
                 style: TextStyle(color: TaskLogStyle.muted))
@@ -809,6 +865,56 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                                     ],
                                   ),
                                 )),
+                            const Divider(
+                                height: 14, color: TaskLogStyle.border),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  const Expanded(
+                                    child: Text(
+                                      'Total Hours Worked',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: TaskLogStyle.teal,
+                                      ),
+                                    ),
+                                  ),
+                                  ...days.map((d) {
+                                    final dayRows = rows.where((r) => sameDay(
+                                        TaskLogStyle.parseEntryDate(
+                                            r['Task Date'] ?? r['date']),
+                                        d));
+                                    final totalH = dayRows.fold<double>(
+                                        0.0,
+                                        (sum, r) =>
+                                            sum +
+                                            countedHours(
+                                                Map<String, dynamic>.from(
+                                                    r as Map)));
+                                    final text = totalH > 0
+                                        ? (totalH * 60 < 60
+                                            ? '${(totalH * 60).round()}m'
+                                            : '${totalH.toStringAsFixed(1)}h')
+                                        : '0h';
+                                    return SizedBox(
+                                      width: colW,
+                                      child: Text(
+                                        text,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                          color: TaskLogStyle.teal,
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ],
+                              ),
+                            ),
                           ],
                         );
                       }
@@ -877,6 +983,48 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                                             id))),
                                       ]),
                                 )),
+                            const Divider(
+                                height: 14, color: TaskLogStyle.border),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 6),
+                              child: Row(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(
+                                    width: actW,
+                                    child: const Text(
+                                      'Total Hours Worked',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                        color: TaskLogStyle.teal,
+                                      ),
+                                    ),
+                                  ),
+                                  ...days.map((d) {
+                                    final dayRows = rows.where((r) => sameDay(
+                                        TaskLogStyle.parseEntryDate(
+                                            r['Task Date'] ?? r['date']),
+                                        d));
+                                    final totalH = dayRows.fold<double>(
+                                        0.0,
+                                        (sum, r) =>
+                                            sum +
+                                            countedHours(
+                                                Map<String, dynamic>.from(
+                                                    r as Map)));
+                                    final text = totalH > 0
+                                        ? formatDuration(totalH)
+                                            .split(' (')
+                                            .first
+                                        : '0 min';
+                                    return cell(text, strong: true);
+                                  }),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       );
