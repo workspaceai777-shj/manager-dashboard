@@ -624,4 +624,70 @@ void main() {
 
     await tester.binding.setSurfaceSize(null);
   });
+
+  testWidgets(
+      'Admin Task Comparison page compares activities across staff with graphical bars and numbers across all widths',
+      (tester) async {
+    final adminApi = FakeStaffApi(
+      role: 'ADMIN',
+      uid: 'admin-1',
+      name: 'Clinic Admin',
+    );
+    final today = DateTime.now();
+    final todayStr =
+        '${today.year.toString().padLeft(4, "0")}-${today.month.toString().padLeft(2, "0")}-${today.day.toString().padLeft(2, "0")}';
+
+    // Farzana did 15 appointments
+    adminApi.allEntries.add({
+      'uid': 'staff-1',
+      'employeeName': 'Farzana',
+      'date': todayStr,
+      'branch': 'ONT-BR1',
+      'category': 'FRONT DESK',
+      'taskId': 'appointments',
+      'quantity': 15,
+      'hours': 1.5,
+      'Task Date': todayStr,
+    });
+
+    // Prince also did 10 appointments on the same date! (Multi-staff activity)
+    adminApi.allEntries.add({
+      'uid': 'staff-2',
+      'employeeName': 'Prince',
+      'date': todayStr,
+      'branch': 'ONT-BR1',
+      'category': 'FRONT DESK',
+      'taskId': 'appointments',
+      'quantity': 10,
+      'hours': 1.0,
+      'Task Date': todayStr,
+    });
+
+    for (final width in widths) {
+      tester.view.physicalSize = Size(width, 900);
+      tester.view.devicePixelRatio = 1.0;
+      await tester.binding.setSurfaceSize(Size(width, 900));
+
+      await tester.pumpWidget(MaterialApp(
+        theme: TaskLogStyle.dark,
+        home: Portal(key: ValueKey('admin-cmp-$width'), api: adminApi),
+      ));
+      await tester.pumpAndSettle();
+
+      // Tap Task Comparison navigation tab
+      await tester.tap(find.byIcon(Icons.compare_arrows));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Task & activity comparison'), findsOneWidget);
+      expect(find.text('Appointments Booked'), findsWidgets);
+      expect(find.text('Compared across 2 staff'), findsWidgets);
+      expect(find.text('Farzana'), findsWidgets);
+      expect(find.text('Prince'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    }
+
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+    await tester.binding.setSurfaceSize(null);
+  });
 }

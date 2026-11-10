@@ -7,6 +7,7 @@ import 'config.dart';
 import 'tasklog_style.dart';
 import 'performance_dashboard.dart';
 import 'staff_detailed_report.dart';
+import 'task_comparison_view.dart';
 import 'admin_settings.dart';
 
 void main() async {
@@ -1044,6 +1045,26 @@ class _PortalState extends State<Portal> {
         },
       );
 
+  Widget taskComparison() => TaskComparisonView(
+        records: entries
+            .where((e) =>
+                (e['employeeName'] ?? '').toString().trim().toLowerCase() !=
+                'administrator')
+            .toList(),
+        staffNames: _staffNameList,
+        branch: adminBranch,
+        category: adminCategory,
+        employee: adminEmployee,
+        singleDate: adminSingleDate,
+        period: adminPeriod,
+        todayOnly: adminTodayOnly,
+        onFilterChanged: _onAdminFilterChanged,
+        refresh: () async {
+          setState(() => loading = true);
+          await load();
+        },
+      );
+
   Widget branchSelector() => SafeArea(
           child: Center(
         child: SingleChildScrollView(
@@ -1151,7 +1172,7 @@ class _PortalState extends State<Portal> {
   Widget responsivePortal(BuildContext context) {
     final narrow = MediaQuery.sizeOf(context).width < 720;
     final pages = manager
-        ? ['Dashboard', 'Detailed Reports', 'Settings']
+        ? ['Dashboard', 'Detailed Reports', 'Task Comparison', 'Settings']
         : ['Daily Tasks', 'My Dashboard'];
     final activePage = pages.contains(page) ? page : pages.first;
     final index = pages.indexOf(activePage);
@@ -1170,6 +1191,7 @@ class _PortalState extends State<Portal> {
             if (activePage == 'Dashboard' || activePage == 'My Dashboard')
               dashboard(),
             if (activePage == 'Detailed Reports' && manager) detailedReports(),
+            if (activePage == 'Task Comparison' && manager) taskComparison(),
             if (activePage == 'Settings' && manager) AdminSettings(api: api),
           ]),
         ),
@@ -1178,6 +1200,7 @@ class _PortalState extends State<Portal> {
     IconData navIcon(String p) {
       if (p == 'Daily Tasks') return Icons.edit_note;
       if (p == 'Detailed Reports') return Icons.assignment_outlined;
+      if (p == 'Task Comparison') return Icons.compare_arrows;
       if (p == 'Settings') return Icons.settings;
       return Icons.bar_chart;
     }
@@ -1230,7 +1253,8 @@ class _PortalState extends State<Portal> {
               onDestinationSelected: (i) {
                 setState(() => page = pages[i]);
                 if (pages[i].contains('Dashboard') ||
-                    pages[i] == 'Detailed Reports') {
+                    pages[i] == 'Detailed Reports' ||
+                    pages[i] == 'Task Comparison') {
                   refreshDashboardData();
                 }
               },
@@ -1314,7 +1338,8 @@ class _PortalState extends State<Portal> {
           onDestinationSelected: (i) {
             setState(() => page = pages[i]);
             if (pages[i].contains('Dashboard') ||
-                pages[i] == 'Detailed Reports') {
+                pages[i] == 'Detailed Reports' ||
+                pages[i] == 'Task Comparison') {
               refreshDashboardData();
             }
           },
