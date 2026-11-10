@@ -52,6 +52,14 @@ class _StaffTaskMetric {
   final List<String> emrList = [];
   final List<String> remarksList = [];
 
+  // Dedicated fields for ledger tracking to prevent duplicate counting
+  double parentLedgerQty = 0.0;
+  double parentLedgerHours = 0.0;
+  double emrBreakdownQty = 0.0;
+  double emrBreakdownHours = 0.0;
+  bool hasParentLedger = false;
+  bool hasEmrBreakdown = false;
+
   _StaffTaskMetric({
     required this.staffName,
     required this.branch,
@@ -105,8 +113,10 @@ class _ActivityGroup {
 
   bool get isCollection => taskId == 'collection';
 
-  bool get isEmr =>
-      taskId == 'ledger_prepared' || taskId == 'insurance_ledger_emr';
+  bool get isLedger =>
+      taskId == 'ledger_updated' ||
+      taskId == 'ledger_prepared' ||
+      taskId == 'insurance_ledger_emr';
 }
 
 class _TaskComparisonViewState extends State<TaskComparisonView> {
@@ -300,16 +310,21 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
       final e = Map<String, dynamic>.from(raw as Map);
       var taskId = (e['taskId'] ?? '').toString().trim();
       if (taskId.isEmpty) continue;
-      // Normalize duplicate EMR/charts task identifiers
-      if (taskId == 'insurance_ledger_emr') {
-        taskId = 'ledger_prepared';
-      }
+
       if (taskId == 'cards_arranged') {
         taskId = 'charts';
       }
       if (taskId == 'emr_updated') {
         continue;
       }
+
+      final isLedgerRow = taskId == 'ledger_updated' ||
+          taskId == 'ledger_prepared' ||
+          taskId == 'insurance_ledger_emr';
+
+      // Merge both ledger activities into a single 'ledger_updated' activity
+      final normalizedTaskId = isLedgerRow ? 'ledger_updated' : taskId;
+
       final cat = (e['category'] ?? 'FRONT DESK').toString().trim();
       final br = (e['branch'] ?? 'ONT-BB').toString().trim();
       final emp = (e['employeeName'] ?? '').toString().trim();
@@ -320,13 +335,13 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
       final emrStr = (e['emr'] ?? '').toString().trim();
       final remStr = (e['remarks'] ?? '').toString().trim();
 
-      final groupKey = '$cat|$taskId';
+      final groupKey = '$cat|$normalizedTaskId';
       final group = map.putIfAbsent(
         groupKey,
         () => _ActivityGroup(
           key: groupKey,
           category: cat,
-          taskId: taskId,
+          taskId: normalizedTaskId,
           sampleBranch: br,
           staffMap: {},
         ),
@@ -341,16 +356,58 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
         ),
       );
 
-      stat.quantity += qtyVal;
-      stat.hours += hrsVal;
       stat.entryCount += 1;
-      if (emrStr.isNotEmpty && !stat.emrList.contains(emrStr)) {
-        stat.emrList.add(emrStr);
-      }
-      if (remStr.isNotEmpty && !stat.remarksList.contains(remStr)) {
-        stat.remarksList.add(remStr);
+
+      if (isLedgerRow) {
+        if (taskId == 'ledger_updated') {
+          stat.parentLedgerQty += qtyVal;
+          stat.parentLedgerHours += hrsVal;
+          stat.hasParentLedger = true;
+        } else {
+          // Individual EMR row (ledger_prepared or insurance_ledger_emr)
+          stat.emrBreakdownQty += (qtyVal > 0 ? qtyVal : 1.0);
+          stat.emrBreakdownHours += hrsVal;
+          stat.hasEmrBreakdown = true;
+          if (emrStr.isNotEmpty && !stat.emrList.contains(emrStr)) {
+            stat.emrList.add(emrStr);
+          }
+          if (remStr.isNotEmpty && !stat.remarksList.contains(remStr)) {
+            stat.remarksList.add(remStr);
+          }
+        }
+      } else {
+        stat.quantity += qtyVal;
+        stat.hours += hrsVal;
       }
     }
+
+    // Resolve merged ledger quantities and hours to prevent duplicate counting
+    for (final group in map.values) {
+      if (group.isLedger) {
+        for (final stat in group.staffMap.values) {
+          if (stat.hasParentLedger && stat.hasEmrBreakdown) {
+            stat.quantity = stat.parentLedgerQty > 0
+                ? stat.parentLedgerQty
+                : (stat.emrList.isNotEmpty
+                    ? stat.emrList.length.toDouble()
+                    : stat.emrBreakdownQty);
+            // Use parent entered hours if greater than 0, otherwise use sum of EMR breakdown hours
+            stat.hours = stat.parentLedgerHours > 0
+                ? stat.parentLedgerHours
+                : stat.emrBreakdownHours;
+          } else if (stat.hasParentLedger) {
+            stat.quantity = stat.parentLedgerQty;
+            stat.hours = stat.parentLedgerHours;
+          } else if (stat.hasEmrBreakdown) {
+            stat.quantity = stat.emrList.isNotEmpty
+                ? stat.emrList.length.toDouble()
+                : (stat.emrBreakdownQty > 0 ? stat.emrBreakdownQty : 1.0);
+            stat.hours = stat.emrBreakdownHours;
+          }
+        }
+      }
+    }
+
     return map;
   }
 
@@ -872,7 +929,7 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
                               ? 'Total: AED ${activity.totalQty.toStringAsFixed(2)}'
                               : (isYesNo
                                   ? 'Done by: ${staffList.where((s) => s.quantity >= 1).length} staff'
-                                  : 'Total: ${activity.totalQty % 1 == 0 ? activity.totalQty.toInt() : activity.totalQty.toStringAsFixed(1)} ${activity.isEmr ? "ledgers" : "units"}'),
+                                  : 'Total: ${activity.totalQty % 1 == 0 ? activity.totalQty.toInt() : activity.totalQty.toStringAsFixed(1)} ${activity.isLedger ? "ledgers" : "units"}'),
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -916,7 +973,7 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
                   ? 'AED ${staff.quantity.toStringAsFixed(2)}'
                   : (isYesNo
                       ? (staff.quantity >= 1 ? 'Yes' : 'No')
-                      : (activity.isEmr
+                      : (activity.isLedger
                           ? '${staff.quantity.toInt()} ledgers'
                           : '${staff.quantity % 1 == 0 ? staff.quantity.toInt() : staff.quantity.toStringAsFixed(1)}'));
 
@@ -1085,13 +1142,46 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
                         ],
                       ),
                       if (staff.emrList.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          'EMR entries: ${staff.emrList.join(", ")}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: TaskLogStyle.muted,
-                            fontStyle: FontStyle.italic,
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0A1524),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: TaskLogStyle.teal
+                                    .withValues(alpha: 0.3)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.receipt_long,
+                                      size: 13, color: TaskLogStyle.teal),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'EMR entries (${staff.emrList.length}):',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: TaskLogStyle.teal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              SelectableText(
+                                staff.emrList.join(', '),
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: TaskLogStyle.ink,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],

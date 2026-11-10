@@ -663,6 +663,45 @@ void main() {
       'Task Date': todayStr,
     });
 
+    // Farzana did 25 ledgers updated
+    adminApi.allEntries.add({
+      'uid': 'staff-1',
+      'employeeName': 'Farzana',
+      'date': todayStr,
+      'branch': 'ONT-BR1',
+      'category': 'FRONT DESK',
+      'taskId': 'ledger_updated',
+      'quantity': 25,
+      'hours': 7.75,
+      'Task Date': todayStr,
+    });
+
+    // Farzana also had EMR breakdown rows (which must merge with ledger_updated without double counting)
+    adminApi.allEntries.add({
+      'uid': 'staff-1',
+      'employeeName': 'Farzana',
+      'date': todayStr,
+      'branch': 'ONT-BR1',
+      'category': 'FRONT DESK',
+      'taskId': 'ledger_prepared',
+      'emr': '1684',
+      'quantity': 1,
+      'hours': 0.31,
+      'Task Date': todayStr,
+    });
+    adminApi.allEntries.add({
+      'uid': 'staff-1',
+      'employeeName': 'Farzana',
+      'date': todayStr,
+      'branch': 'ONT-BR1',
+      'category': 'FRONT DESK',
+      'taskId': 'ledger_prepared',
+      'emr': '1685',
+      'quantity': 1,
+      'hours': 0.31,
+      'Task Date': todayStr,
+    });
+
     for (final width in widths) {
       tester.view.physicalSize = Size(width, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -683,6 +722,16 @@ void main() {
       expect(find.text('Compared across 2 staff'), findsWidgets);
       expect(find.text('Farzana'), findsWidgets);
       expect(find.text('Prince'), findsWidgets);
+
+      // Verify ledger activities are merged as one, showing EMR entries and no duplicate activity
+      expect(find.text('Ledger Updated (R4) (including for insurance)'), findsWidgets);
+      expect(find.text('Individual Ledgers Prepared (EMR-wise)'), findsNothing);
+      expect(find.text('EMR entries (2):'), findsWidgets);
+      expect(find.text('1684, 1685'), findsWidgets);
+
+      // Verify Farzana's workload distribution: 15 appt + 25 ledger = 40 tasks (not 42!), 1.5h + 7.75h = 9.3h (not 9.9h!)
+      expect(find.text('40 tasks · 9.3h'), findsWidgets);
+
       expect(tester.takeException(), isNull);
     }
 
