@@ -1,5 +1,11 @@
 import admin from 'firebase-admin';
 import { google } from 'googleapis';
+import {
+  isSupabaseConfigured,
+  readSupabaseTable,
+  insertSupabaseRows,
+  deleteSupabaseRows,
+} from './supabaseClient.js';
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID || '1Zr7W7P7JUTUR43nDmR1YWmvqYsdctdzmMfM7Px-q7lo';
 const TAB_USERS = 'App_Users', TAB_ASSIGN = 'App_Assignments', TAB_ENTRIES = 'App_Entries';
@@ -82,6 +88,98 @@ async function append(sheets,tab,rows) {
   await sheets.spreadsheets.values.append({spreadsheetId:SHEET_ID,range:`'${tab}'!A1`,valueInputOption:'RAW',
     insertDataOption:'INSERT_ROWS',requestBody:{values:rows}});
 }
+
+// -----------------------------------------------------------------------------
+// Unified Database Abstraction (Supabase primary, Google Sheets fallback)
+// -----------------------------------------------------------------------------
+async function dbGetUsers(sheets) {
+  if (isSupabaseConfigured()) {
+    const list = await readSupabaseTable('app_users', 'select=uid,email,name,role,active');
+    return list.map(u => ({ uid: u.uid, email: u.email, name: u.name, role: u.role, active: String(u.active) }));
+  }
+  return await readTab(sheets, TAB_USERS);
+}
+
+async function dbGetAssignments(sheets) {
+  if (isSupabaseConfigured()) {
+    const list = await readSupabaseTable('app_assignments', 'select=uid,branch,category,active');
+    return list.map(a => ({ uid: a.uid, branch: a.branch, category: a.category, active: String(a.active) }));
+  }
+  return await readTab(sheets, TAB_ASSIGN);
+}
+
+async function dbGetActiveEntries(sheets) {
+  if (isSupabaseConfigured()) {
+    const list = await readSupabaseTable('v_active_task_entries', 'select=*&order=created_at.asc');
+    return list.map(e => ({
+      id: e.id,
+      createdAt: e.created_at,
+      uid: e.uid,
+      employeeName: e.employee_name,
+      date: normalizeEntryDate(e.date),
+      branch: e.branch,
+      category: e.category,
+      taskId: e.task_id,
+      emr: e.emr || '',
+      remarks: e.remarks || '',
+      quantity: String(e.quantity ?? 0),
+      hours: String(e.hours ?? 0),
+      'Task Date': normalizeEntryDate(e.task_date || e.date),
+    }));
+  }
+  return activeEntries(await readEntries(sheets));
+}
+
+async function dbSaveEntries(sheets, markerRow, dataRows) {
+  if (isSupabaseConfigured()) {
+    const toInsert = [];
+    if (markerRow) {
+      toInsert.push({
+        id: markerRow[0],
+        created_at: markerRow[1],
+        uid: markerRow[2],
+        employee_name: markerRow[3],
+        date: markerRow[4],
+        branch: markerRow[5],
+        category: markerRow[6],
+        task_id: markerRow[7],
+        emr: markerRow[8] || '',
+        remarks: markerRow[9] || '',
+        quantity: Number(markerRow[10]) || 0,
+        hours: Number(markerRow[11]) || 0,
+        task_date: markerRow[12] || markerRow[4],
+      });
+    }
+    for (const r of dataRows) {
+      toInsert.push({
+        id: r[0],
+        created_at: r[1],
+        uid: r[2],
+        employee_name: r[3],
+        date: r[4],
+        branch: r[5],
+        category: r[6],
+        task_id: r[7],
+        emr: r[8] || '',
+        remarks: r[9] || '',
+        quantity: Number(r[10]) || 0,
+        hours: Number(r[11]) || 0,
+        task_date: r[12] || r[4],
+      });
+    }
+    if (toInsert.length) {
+      await insertSupabaseRows('app_entries', toInsert);
+    }
+    return;
+  }
+  await ensureTaskDateColumn(sheets);
+  if (markerRow) {
+    await append(sheets, TAB_ENTRIES, [markerRow, ...dataRows]);
+  } else if (dataRows.length) {
+    await append(sheets, TAB_ENTRIES, dataRows);
+  }
+}
+
 const baseReception=[
 ['registrations','Patient Registrations (including treatment chart and case sheet)'],
 ['appointments','Appointments Booked'],['calls','Calls Attended'],['whatsapp','WhatsApp Enquiries Replied'],
@@ -142,6 +240,7 @@ const accounts=[
   ['accounts_whitefox_consignment_sale','White fox Consignment basis sale checking and update'],
   ['accounts_petty_cash_voucher_entry','Petty cash voucher entry and filing'],
   ['accounts_petty_cash_excel','Petty cash excel'],
+  ['accounts_monthly_collection_excel','Monthly collection excel'],
   ['accounts_purchase_request_month','Purchase request for one month']
 ];
 const doctorsZone=[
@@ -201,11 +300,12 @@ export default async function handler(req,res){
     const verified=await admin.auth().verifyIdToken(token,true);
     const uid=verified.uid;
     const body=req.body||{};
-    const sheets=sheetClient();
-    const users=await readTab(sheets,TAB_USERS);
+    const useSupabase = isSupabaseConfigured();
+    const sheets = useSupabase ? null : sheetClient();
+    const users = await dbGetUsers(sheets);
     const me=users.find(u=>u.uid===uid && String(u.active).toLowerCase()==='true');
     if(!me)return result(res,403,{error:'No active staff account. Ask an administrator.'});
-    const assignments=(await readTab(sheets,TAB_ASSIGN)).filter(a=>a.uid===uid && String(a.active).toLowerCase()==='true');
+    const assignments=(await dbGetAssignments(sheets)).filter(a=>a.uid===uid && String(a.active).toLowerCase()==='true');
     const check=(branch,category)=> allowedBranches.includes(branch)&&allowedCategories.includes(category)&&(
       me.role==='ADMIN'||assignments.some(a=>a.branch===branch&&a.category===category));
     if(body.action==='bootstrap')return result(res,200,{profile:me,assignments:me.role==='ADMIN'?
@@ -217,7 +317,7 @@ export default async function handler(req,res){
     if(body.action==='report'){
       if(!check(body.branch,body.category))return result(res,403,{error:'Category not assigned'});
       if(!validDate(body.date))return result(res,400,{error:'Invalid reporting date'});
-      const all=activeEntries(await readEntries(sheets));
+      const all=await dbGetActiveEntries(sheets);
       const mine=all.filter(e=>e.uid===uid&&e.branch===body.branch&&
         e.category===body.category&&e.date===body.date);
       return result(res,200,{entries:mine});
@@ -250,21 +350,19 @@ export default async function handler(req,res){
         } else if(emr) return result(res,400,{error:'EMR is only accepted for EMR-wise preparation'});
         rows.push([crypto.randomUUID(),new Date().toISOString(),uid,me.name,body.date,body.branch,body.category,task,emr,remarks,normalizedQuantity,hours,body.date]);
       }
-      await ensureTaskDateColumn(sheets);
       if(body.action==='saveReport'){
-        // One append request commits the replacement marker and new records.
         const marker=[crypto.randomUUID(),new Date().toISOString(),uid,me.name,
           body.date,body.branch,body.category,REPLACE_MARKER,'','',0,0,body.date];
-        await append(sheets,TAB_ENTRIES,[marker,...rows]);
+        await dbSaveEntries(sheets, marker, rows);
       } else {
-        if(rows.length)await append(sheets,TAB_ENTRIES,rows);
+        await dbSaveEntries(sheets, null, rows);
       }
       return result(res,200,{saved:rows.length});
     }
     if(body.action==='dashboard'||body.action==='myDashboard'){
       if(body.action==='dashboard'&&me.role!=='ADMIN')
         return result(res,403,{error:'Administrator access required'});
-      const all=activeEntries(await readEntries(sheets));
+      const all=await dbGetActiveEntries(sheets);
       const adminUids=new Set(users.filter(u=>u.role==='ADMIN').map(u=>u.uid));
       const from=validDate(body.from)?body.from:'0000-01-01';
       const to=validDate(body.to)?body.to:'9999-12-31';
@@ -274,7 +372,7 @@ export default async function handler(req,res){
     }
     if(body.action==='users'){
       if(me.role!=='ADMIN')return result(res,403,{error:'Admin access required'});
-      const allAssign=await readTab(sheets,TAB_ASSIGN);
+      const allAssign=await dbGetAssignments(sheets);
       return result(res,200,{users:users.flatMap(u=>allAssign.filter(a=>a.uid===u.uid).map(a=>({...u,branch:a.branch,category:a.category})))});
     }
 
@@ -292,8 +390,13 @@ export default async function handler(req,res){
         return result(res,400,{error:'Invalid user details, password, or assignments'});
       const created=await admin.auth().createUser({email,password,displayName:name,emailVerified:false,disabled:false});
       try{
-        await append(sheets,TAB_USERS,[[created.uid,email,name,role,true]]);
-        await append(sheets,TAB_ASSIGN,selected.map(a=>[created.uid,a.branch,a.category,true]));
+        if (useSupabase) {
+          await insertSupabaseRows('app_users', [{ uid: created.uid, email, name, role, active: true }]);
+          await insertSupabaseRows('app_assignments', selected.map(a => ({ uid: created.uid, branch: a.branch, category: a.category, active: true })));
+        } else {
+          await append(sheets,TAB_USERS,[[created.uid,email,name,role,true]]);
+          await append(sheets,TAB_ASSIGN,selected.map(a=>[created.uid,a.branch,a.category,true]));
+        }
       }catch(e){
         // Avoid leaving a valid sign-in account without a matching staff role.
         await admin.auth().updateUser(created.uid,{disabled:true}).catch(()=>{});
@@ -311,13 +414,19 @@ export default async function handler(req,res){
         return result(res,400,{error:'Invalid assignments'});
       if(!users.some(u=>u.uid===target))return result(res,404,{error:'Unknown user'});
       if(target===uid && selected.length===0)return result(res,400,{error:'Cannot revoke your own last assignment'});
-      const existing=await readTab(sheets,TAB_ASSIGN);
-      const next=existing.filter(a=>a.uid!==target).map(a=>[a.uid,a.branch,a.category,a.active]);
-      next.push(...selected.map(a=>[target,a.branch,a.category,true]));
-      // Overwrite entire small assignment table in one operation; preserves the header.
-      await sheets.spreadsheets.values.clear({spreadsheetId:SHEET_ID,range:"'App_Assignments'!A2:D20000"});
-      if(next.length)await sheets.spreadsheets.values.update({spreadsheetId:SHEET_ID,
-        range:"'App_Assignments'!A2",valueInputOption:'RAW',requestBody:{values:next}});
+      if (useSupabase) {
+        await deleteSupabaseRows('app_assignments', `uid=eq.${encodeURIComponent(target)}`);
+        if (selected.length) {
+          await insertSupabaseRows('app_assignments', selected.map(a => ({ uid: target, branch: a.branch, category: a.category, active: true })));
+        }
+      } else {
+        const existing=await readTab(sheets,TAB_ASSIGN);
+        const next=existing.filter(a=>a.uid!==target).map(a=>[a.uid,a.branch,a.category,a.active]);
+        next.push(...selected.map(a=>[target,a.branch,a.category,true]));
+        await sheets.spreadsheets.values.clear({spreadsheetId:SHEET_ID,range:"'App_Assignments'!A2:D20000"});
+        if(next.length)await sheets.spreadsheets.values.update({spreadsheetId:SHEET_ID,
+          range:"'App_Assignments'!A2",valueInputOption:'RAW',requestBody:{values:next}});
+      }
       return result(res,200,{ok:true});
     }
     if(body.action==='upsertUser'){
@@ -329,9 +438,19 @@ export default async function handler(req,res){
       if(firebaseUser.email?.toLowerCase()!==String(email).toLowerCase())return result(res,400,{error:'Firebase UID/email mismatch'});
       const existing=users.find(x=>x.uid===target);
       if(existing && (existing.name!==name||existing.role!==role))return result(res,409,{error:'Existing user changes require a separate review/update operation'});
-      if(!existing)await append(sheets,TAB_USERS,[[target,email,name,role,true]]);
-      const allAssign=await readTab(sheets,TAB_ASSIGN);
-      if(!allAssign.some(x=>x.uid===target&&x.branch===branch&&x.category===category))await append(sheets,TAB_ASSIGN,[[target,branch,category,true]]);
+      if (useSupabase) {
+        if (!existing) {
+          await insertSupabaseRows('app_users', [{ uid: target, email, name, role, active: true }]);
+        }
+        const existingAssignments = await readSupabaseTable('app_assignments', `uid=eq.${encodeURIComponent(target)}&branch=eq.${encodeURIComponent(branch)}&category=eq.${encodeURIComponent(category)}`);
+        if (!existingAssignments || existingAssignments.length === 0) {
+          await insertSupabaseRows('app_assignments', [{ uid: target, branch, category, active: true }]);
+        }
+      } else {
+        if(!existing)await append(sheets,TAB_USERS,[[target,email,name,role,true]]);
+        const allAssign=await readTab(sheets,TAB_ASSIGN);
+        if(!allAssign.some(x=>x.uid===target&&x.branch===branch&&x.category===category))await append(sheets,TAB_ASSIGN,[[target,branch,category,true]]);
+      }
       return result(res,200,{ok:true});
     }
     return result(res,400,{error:'Unknown action'});
