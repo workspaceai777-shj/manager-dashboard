@@ -622,6 +622,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('CategoryFRONT DESK')), findsOneWidget);
 
+    // Verify Yesterday filter button is displayed with correct date and activates filter
+    final yesterdayDateLabel =
+        '${yesterday.day.toString().padLeft(2, "0")}/${yesterday.month.toString().padLeft(2, "0")}/${yesterday.year}';
+    expect(find.text('Yesterday — $yesterdayDateLabel'), findsWidgets);
+    await tester.tap(find.text('Yesterday — $yesterdayDateLabel').first);
+    await tester.pumpAndSettle();
+
     await tester.binding.setSurfaceSize(null);
   });
 

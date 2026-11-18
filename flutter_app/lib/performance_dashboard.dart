@@ -679,6 +679,15 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
               );
             }),
     );
+    final now = DateTime.now();
+    final yesterday = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
+    final isYesterday = !todayOnly &&
+        singleDate != null &&
+        singleDate!.year == yesterday.year &&
+        singleDate!.month == yesterday.month &&
+        singleDate!.day == yesterday.day;
+    final isOtherSingleDate = !todayOnly && singleDate != null && !isYesterday;
+
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Expanded(
@@ -713,18 +722,27 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
             ? FilledButton.tonalIcon(
                 icon: const Icon(Icons.today),
                 onPressed: () => _setFilter(todayOnly: true),
-                label: Text('Today — ${dateLabel(DateTime.now())}'))
+                label: Text('Today — ${dateLabel(now)}'))
             : OutlinedButton.icon(
                 icon: const Icon(Icons.today),
                 onPressed: () => _setFilter(todayOnly: true),
-                label: Text('Today — ${dateLabel(DateTime.now())}')),
-        singleDate != null
+                label: Text('Today — ${dateLabel(now)}')),
+        isYesterday
+            ? FilledButton.tonalIcon(
+                icon: const Icon(Icons.history),
+                onPressed: () => _setFilter(singleDate: yesterday),
+                label: Text('Yesterday — ${dateLabel(yesterday)}'))
+            : OutlinedButton.icon(
+                icon: const Icon(Icons.history),
+                onPressed: () => _setFilter(singleDate: yesterday),
+                label: Text('Yesterday — ${dateLabel(yesterday)}')),
+        isOtherSingleDate
             ? FilledButton.tonalIcon(
                 icon: const Icon(Icons.calendar_month),
                 onPressed: () async {
                   final v = await showDatePicker(
                       context: context,
-                      initialDate: singleDate ?? DateTime.now(),
+                      initialDate: singleDate ?? now,
                       firstDate: DateTime(2024),
                       lastDate: DateTime(2036));
                   if (v != null) {
@@ -737,7 +755,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                 onPressed: () async {
                   final v = await showDatePicker(
                       context: context,
-                      initialDate: singleDate ?? DateTime.now(),
+                      initialDate: singleDate ?? now,
                       firstDate: DateTime(2024),
                       lastDate: DateTime(2036));
                   if (v != null) {

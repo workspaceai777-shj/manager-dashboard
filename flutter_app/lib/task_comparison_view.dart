@@ -437,7 +437,17 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
         ),
       );
 
-  Widget _buildFilterBar() => Wrap(
+  Widget _buildFilterBar() {
+    final now = DateTime.now();
+    final yesterday = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
+    final isYesterday = !todayOnly &&
+        singleDate != null &&
+        singleDate!.year == yesterday.year &&
+        singleDate!.month == yesterday.month &&
+        singleDate!.day == yesterday.day;
+    final isOtherSingleDate = !todayOnly && singleDate != null && !isYesterday;
+
+    return Wrap(
         spacing: 10,
         runSpacing: 10,
         crossAxisAlignment: WrapCrossAlignment.center,
@@ -458,13 +468,25 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
               side: const BorderSide(color: TaskLogStyle.border),
             ),
             icon: const Icon(Icons.event_available, size: 18),
-            label: Text('Today — ${dateLabel(DateTime.now())}'),
+            label: Text('Today — ${dateLabel(now)}'),
+          ),
+          FilledButton.icon(
+            onPressed: () => _setFilter(singleDate: yesterday),
+            style: FilledButton.styleFrom(
+              backgroundColor:
+                  isYesterday ? TaskLogStyle.teal : TaskLogStyle.surface,
+              foregroundColor:
+                  isYesterday ? const Color(0xFF061425) : TaskLogStyle.ink,
+              side: const BorderSide(color: TaskLogStyle.border),
+            ),
+            icon: const Icon(Icons.history, size: 18),
+            label: Text('Yesterday — ${dateLabel(yesterday)}'),
           ),
           OutlinedButton.icon(
             onPressed: () async {
               final picked = await showDatePicker(
                 context: context,
-                initialDate: singleDate ?? DateTime.now(),
+                initialDate: singleDate ?? now,
                 firstDate: DateTime(2024),
                 lastDate: DateTime(2035),
               );
@@ -473,23 +495,23 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
               }
             },
             style: OutlinedButton.styleFrom(
-              backgroundColor: singleDate != null
+              backgroundColor: isOtherSingleDate
                   ? TaskLogStyle.teal.withValues(alpha: 0.15)
                   : null,
               side: BorderSide(
-                color: singleDate != null
+                color: isOtherSingleDate
                     ? TaskLogStyle.teal
                     : TaskLogStyle.border,
               ),
             ),
             icon: const Icon(Icons.calendar_month, size: 18),
             label: Text(
-              singleDate != null ? dateLabel(singleDate!) : 'Choose date',
+              isOtherSingleDate ? dateLabel(singleDate!) : 'Choose date',
               style: TextStyle(
                 color:
-                    singleDate != null ? TaskLogStyle.teal : TaskLogStyle.ink,
+                    isOtherSingleDate ? TaskLogStyle.teal : TaskLogStyle.ink,
                 fontWeight:
-                    singleDate != null ? FontWeight.w700 : FontWeight.w500,
+                    isOtherSingleDate ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
           ),
@@ -530,6 +552,7 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
           ),
         ],
       );
+  }
 
   Widget _buildExecutiveOverview(
       int totalActivities, int multiStaffCount, List<_ActivityGroup> groups) {

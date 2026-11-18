@@ -82,3 +82,4 @@ export async function patchSupabaseRows(table, queryParams, updates) {
   }
   return await res.json();
 }
+

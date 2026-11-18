@@ -1041,6 +1041,14 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
   @override
   Widget build(BuildContext context) {
     final rows = filteredRows;
+    final now = DateTime.now();
+    final yesterday = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
+    final isYesterday = !todayOnly &&
+        singleDate != null &&
+        singleDate!.year == yesterday.year &&
+        singleDate!.month == yesterday.month &&
+        singleDate!.day == yesterday.day;
+    final isOtherSingleDate = !todayOnly && singleDate != null && !isYesterday;
 
     // Group rows by Section (category) -> Staff + Date + Branch
     final sections = <String, List<Map<String, dynamic>>>{};
@@ -1105,20 +1113,31 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                 ? FilledButton.tonalIcon(
                     icon: const Icon(Icons.today),
                     onPressed: () => _setFilter(todayOnly: true),
-                    label: Text('Today — ${dateLabel(DateTime.now())}'),
+                    label: Text('Today — ${dateLabel(now)}'),
                   )
                 : OutlinedButton.icon(
                     icon: const Icon(Icons.today),
                     onPressed: () => _setFilter(todayOnly: true),
-                    label: Text('Today — ${dateLabel(DateTime.now())}'),
+                    label: Text('Today — ${dateLabel(now)}'),
                   ),
-            singleDate != null
+            isYesterday
+                ? FilledButton.tonalIcon(
+                    icon: const Icon(Icons.history),
+                    onPressed: () => _setFilter(singleDate: yesterday),
+                    label: Text('Yesterday — ${dateLabel(yesterday)}'),
+                  )
+                : OutlinedButton.icon(
+                    icon: const Icon(Icons.history),
+                    onPressed: () => _setFilter(singleDate: yesterday),
+                    label: Text('Yesterday — ${dateLabel(yesterday)}'),
+                  ),
+            isOtherSingleDate
                 ? FilledButton.tonalIcon(
                     icon: const Icon(Icons.calendar_month),
                     onPressed: () async {
                       final v = await showDatePicker(
                         context: context,
-                        initialDate: singleDate ?? DateTime.now(),
+                        initialDate: singleDate ?? now,
                         firstDate: DateTime(2024),
                         lastDate: DateTime(2036),
                       );
@@ -1134,7 +1153,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                     onPressed: () async {
                       final v = await showDatePicker(
                         context: context,
-                        initialDate: singleDate ?? DateTime.now(),
+                        initialDate: singleDate ?? now,
                         firstDate: DateTime(2024),
                         lastDate: DateTime(2036),
                       );
