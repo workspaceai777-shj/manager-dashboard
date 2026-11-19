@@ -257,6 +257,9 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
         if (empName.toLowerCase() == 'administrator') {
           return false;
         }
+        // Enquiry call details are a breakdown of "Enquiries Handled"; they must
+        // never add to quantities or hours.
+        if (e['taskId'] == 'enquiry_detail') return false;
         if (branch != 'ALL' && e['branch'] != branch) {
           return false;
         }

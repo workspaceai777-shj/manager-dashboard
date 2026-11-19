@@ -474,6 +474,16 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
     final out = <Map<String, dynamic>>[];
     final used = <int>{};
 
+    // Enquiry call details are shown beneath "Enquiries Handled" rather than as
+    // activities of their own, and are never counted.
+    final enquiryDetails = <Map<String, dynamic>>[];
+    for (var i = 0; i < recorded.length; i++) {
+      if ((recorded[i]['taskId'] ?? '').toString() == 'enquiry_detail') {
+        enquiryDetails.add(recorded[i]);
+        used.add(i);
+      }
+    }
+
     // 1. Standard catalog activities first
     for (final id in standardCatalog) {
       var found = false;
@@ -526,6 +536,13 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
         out.add(recorded[i]);
       }
     }
+
+    if (enquiryDetails.isNotEmpty) {
+      final idx = out.indexWhere((r) => (r['taskId'] ?? '') == 'enquiries');
+      if (idx >= 0) {
+        out[idx] = {...out[idx], '_enquiryDetails': enquiryDetails};
+      }
+    }
     return out;
   }
 
@@ -533,7 +550,11 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
   /// time is not added to any total.
   double countedHours(Map<String, dynamic> r) {
     final id = (r['taskId'] ?? '').toString();
-    if (id == 'ledger_prepared' || id == 'insurance_ledger_emr') return 0;
+    if (id == 'ledger_prepared' ||
+        id == 'insurance_ledger_emr' ||
+        id == 'enquiry_detail') {
+      return 0;
+    }
     return numVal(r['hours']);
   }
 
@@ -543,6 +564,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
     final id = (r['taskId'] ?? '').toString();
     if (id == 'collection' ||
         id == 'other_tasks' ||
+        id == 'enquiry_detail' ||
         _yesNoTaskIds.contains(id)) {
       return 0;
     }
@@ -654,6 +676,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       if (employee != 'ALL' && name != employee) return false;
       final d = TaskLogStyle.parseEntryDate(e['Task Date'] ?? e['date']);
       if (e['taskId'] == 'insurance_ledger_emr' ||
+          e['taskId'] == 'enquiry_detail' ||
           e['taskId'] == 'emr_updated') {
         return false;
       }
@@ -1033,6 +1056,91 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                 ),
               );
             }),
+        ],
+      ),
+    );
+  }
+
+  /// Per-call breakdown under "Enquiries Handled". Reference only — its minutes
+  /// are intentionally not part of any total.
+  Widget enquiryDetailsList(List<Map<String, dynamic>> details) {
+    return Container(
+      key: const ValueKey('enquiry-details-list'),
+      width: double.infinity,
+      margin: const EdgeInsets.only(left: 20),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1524),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: TaskLogStyle.teal.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Enquiry details (${details.length})',
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: TaskLogStyle.teal)),
+          const SizedBox(height: 6),
+          for (final d in details)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text('#${(d['emr'] ?? '').toString().trim()}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12.5,
+                              color: TaskLogStyle.teal)),
+                      Text(
+                          (d['callerName'] ?? '').toString().trim().isEmpty
+                              ? 'Unnamed caller'
+                              : (d['callerName']).toString().trim(),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12.5,
+                              color: TaskLogStyle.ink)),
+                      if ((d['callStatus'] ?? '').toString().trim().isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: TaskLogStyle.teal.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text((d['callStatus']).toString().trim(),
+                              style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: TaskLogStyle.teal)),
+                        ),
+                      Text(
+                          numVal(d['hours']) > 0
+                              ? formatDuration(numVal(d['hours']))
+                              : '—',
+                          style: const TextStyle(
+                              fontSize: 12.5, color: TaskLogStyle.muted)),
+                    ],
+                  ),
+                  if ((d['remarks'] ?? '').toString().trim().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text('Remarks: ${(d['remarks']).toString().trim()}',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: TaskLogStyle.muted,
+                              fontStyle: FontStyle.italic)),
+                    ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -1581,6 +1689,17 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                                           ),
                                         ),
                                       ),
+                                    ],
+                                    if (r['_enquiryDetails'] is List &&
+                                        (r['_enquiryDetails'] as List)
+                                            .isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      enquiryDetailsList(
+                                          (r['_enquiryDetails'] as List)
+                                              .map((e) =>
+                                                  Map<String, dynamic>.from(
+                                                      e as Map))
+                                              .toList()),
                                     ],
                                   ],
                                 ),

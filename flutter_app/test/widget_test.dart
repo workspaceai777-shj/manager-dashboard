@@ -143,6 +143,7 @@ class FakeStaffApi extends StaffApi {
         'name':
             'Patient Registrations (including treatment chart and case sheet)'
       },
+      {'id': 'enquiries', 'name': 'Enquiries Handled'},
       {
         'id': 'ledger_prepared',
         'name': 'Individual Ledgers Prepared (EMR-wise)'
@@ -218,6 +219,8 @@ class FakeStaffApi extends StaffApi {
             'remarks': row['remarks'] ?? '',
             'quantity': row['quantity'],
             'hours': row['hours'],
+            'callerName': row['callerName'] ?? '',
+            'callStatus': row['callStatus'] ?? '',
           });
         }
         return {'saved': incoming.length};
@@ -745,5 +748,170 @@ void main() {
     tester.view.resetPhysicalSize();
     tester.view.resetDevicePixelRatio();
     await tester.binding.setSurfaceSize(null);
+  });
+
+  testWidgets(
+      'Enquiries Handled: per-call details are saved and restored without touching the activity quantity or minutes',
+      (tester) async {
+    addTearDown(tester.view.reset);
+    for (final width in const <double>[360, 390, 1280]) {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = Size(width, 1400);
+      final staffApi = FakeStaffApi(
+        role: 'STAFF',
+        uid: 'staff-farzana',
+        name: 'Farzana',
+      );
+      // Fresh app (and ScaffoldMessenger) per width so a previous run's snackbar
+      // cannot cover the Save button.
+      await tester.pumpWidget(MaterialApp(
+        key: ValueKey('enq-app-$width'),
+        theme: TaskLogStyle.dark,
+        home: Portal(key: ValueKey('enq-$width'), api: staffApi),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('ONT-BR1').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Enquiries Handled'), findsOneWidget);
+      // Activities: 1 Registrations, 2 Enquiries Handled, 3 Ledger Updated, 4 Collection
+      expect(find.text('Enquiry details — activity 2'), findsOneWidget);
+
+      // Activity 2's own quantity / minutes are typed by hand.
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Quantity').at(1), '3');
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Minutes').at(1), '25');
+
+      // Two enquiry rows are numbered 1 and 2 automatically; row 2 stays blank.
+      await tester.ensureVisible(find.byKey(const ValueKey('add-enquiry')));
+      await tester.tap(find.byKey(const ValueKey('add-enquiry')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const ValueKey('add-enquiry')));
+      await tester.tap(find.byKey(const ValueKey('add-enquiry')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('enq-row-0')), findsOneWidget);
+      expect(find.byKey(const ValueKey('enq-row-1')), findsOneWidget);
+      expect(find.widgetWithText(TextField, '1'), findsOneWidget);
+      expect(find.widgetWithText(TextField, '2'), findsOneWidget);
+
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Caller name').first, 'Mrs Sharma');
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Remarks').first, 'Asked about braces');
+      // Minutes fields: [0] registrations, [1] enquiries activity, [2] enquiry row 1
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Minutes').at(2), '10');
+      await tester.ensureVisible(find.byKey(const ValueKey('enq-status-0-')));
+      await tester.tap(find.byKey(const ValueKey('enq-status-0-')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Appointment booked').last);
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Save daily report'));
+      await tester.tap(find.text('Save daily report'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirm & Save'));
+      await tester.pumpAndSettle();
+
+      final saved = staffApi.allEntries
+          .where((e) => e['uid'] == 'staff-farzana')
+          .toList();
+      final activity =
+          saved.singleWhere((e) => e['taskId'] == 'enquiries');
+      expect(activity['quantity'], 3,
+          reason: 'quantity is NOT derived from the number of calls');
+      expect(activity['hours'], closeTo(25 / 60, 1e-9),
+          reason: 'minutes are NOT the sum of the call minutes');
+      final details =
+          saved.where((e) => e['taskId'] == 'enquiry_detail').toList();
+      expect(details, hasLength(1), reason: 'the blank row is not saved');
+      expect(details.single['emr'], '1');
+      expect(details.single['callerName'], 'Mrs Sharma');
+      expect(details.single['callStatus'], 'Appointment booked');
+      expect(details.single['remarks'], 'Asked about braces');
+      expect(details.single['hours'], closeTo(10 / 60, 1e-9));
+
+      // Reloaded from the saved report: the call is restored, blank row is gone.
+      expect(find.byKey(const ValueKey('enq-row-0')), findsOneWidget);
+      expect(find.byKey(const ValueKey('enq-row-1')), findsNothing);
+      expect(find.text('Mrs Sharma'), findsOneWidget);
+      expect(find.text('Appointment booked'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets(
+      'Enquiry call details appear under activity 7 in the Detailed Report but never count toward totals',
+      (tester) async {
+    addTearDown(tester.view.reset);
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(1280, 1600);
+    final adminApi = FakeStaffApi(
+      role: 'ADMIN',
+      uid: 'admin-1',
+      name: 'Clinic Admin',
+    );
+    final today = FakeStaffApi._todayStr();
+    Map<String, dynamic> row(String task, num qty, double hrs,
+            {String emr = '',
+            String remarks = '',
+            String caller = '',
+            String status = ''}) =>
+        {
+          'uid': 'staff-farzana',
+          'employeeName': 'Farzana',
+          'date': today,
+          'Task Date': today,
+          'branch': 'ONT-BR1',
+          'category': 'FRONT DESK',
+          'taskId': task,
+          'emr': emr,
+          'remarks': remarks,
+          'quantity': qty,
+          'hours': hrs,
+          'callerName': caller,
+          'callStatus': status,
+        };
+    adminApi.allEntries
+      ..add(row('registrations', 2, 30 / 60))
+      ..add(row('enquiries', 3, 25 / 60))
+      ..add(row('enquiry_detail', 1, 20 / 60,
+          emr: '1',
+          caller: 'Mrs Sharma',
+          status: 'Appointment booked',
+          remarks: 'Asked about braces'))
+      ..add(row('enquiry_detail', 1, 40 / 60,
+          emr: '2', caller: 'Mr Khan', status: 'Follow-up required'));
+
+    await tester.pumpWidget(MaterialApp(
+      theme: TaskLogStyle.dark,
+      home: Portal(key: const ValueKey('enq-report'), api: adminApi),
+    ));
+    await tester.pumpAndSettle();
+
+    // Dashboard: Farzana's time is 30 + 25 = 55 min (the 60 min of calls is ignored).
+    expect(find.text('Farzana — Time worked'), findsOneWidget);
+    expect(find.text('55 min'), findsWidgets);
+    expect(find.text('1 hrs'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.assignment_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('Staff detailed activity reports'), findsOneWidget);
+
+    // Detailed report: details are listed beneath activity "Enquiries Handled".
+    expect(find.text('Enquiry details (2)'), findsOneWidget);
+    expect(find.text('Mrs Sharma'), findsOneWidget);
+    expect(find.text('Appointment booked'), findsOneWidget);
+    expect(find.text('Remarks: Asked about braces'), findsOneWidget);
+    expect(find.text('Mr Khan'), findsOneWidget);
+    expect(find.text('Follow-up required'), findsOneWidget);
+    // Totals use only the activity-level minutes (30 + 25), not the call minutes.
+    expect(find.text('Total Time: 55 min'), findsOneWidget);
+    // If the 60 call-minutes were counted this would read 1.92 hrs (115 min).
+    expect(find.text('Total Time: 1.92 hrs (115 min)'), findsNothing);
+    // The activity keeps its own typed quantity.
+    expect(find.text('Qty: 3'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

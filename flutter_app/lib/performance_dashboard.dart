@@ -170,6 +170,9 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
         if (empName.toLowerCase() == 'administrator') {
           return false;
         }
+        // Enquiry call details are a breakdown of "Enquiries Handled"; they must
+        // never add to quantities or hours.
+        if (e['taskId'] == 'enquiry_detail') return false;
         if (!widget.isAdmin) {
           final rowUid = (e['uid'] ?? '').toString().trim();
           if (widget.currentStaffUid.isNotEmpty &&

@@ -24,17 +24,27 @@ function getBaseUrl() {
   return (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 }
 
+// PostgREST caps a single response (Supabase default: 1000 rows), so every read
+// is paged with the Range header until a short page is returned. Callers that
+// need a stable order must pass an explicit `order=` in queryParams.
+const PAGE_SIZE = 1000;
 export async function readSupabaseTable(table, queryParams = '') {
   const url = `${getBaseUrl()}/rest/v1/${table}${queryParams ? `?${queryParams}` : ''}`;
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: getHeaders(),
-  });
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Supabase GET ${table} failed (${res.status}): ${errorText}`);
+  const all = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { ...getHeaders(), Range: `${from}-${from + PAGE_SIZE - 1}`, 'Range-Unit': 'items' },
+    });
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Supabase GET ${table} failed (${res.status}): ${errorText}`);
+    }
+    const page = await res.json();
+    all.push(...page);
+    if (page.length < PAGE_SIZE) break;
   }
-  return await res.json();
+  return all;
 }
 
 export async function insertSupabaseRows(table, rows, upsert = false) {

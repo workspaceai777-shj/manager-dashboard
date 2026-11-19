@@ -108,23 +108,62 @@ async function dbGetAssignments(sheets) {
   return await readTab(sheets, TAB_ASSIGN);
 }
 
+const TIMED_TASKS = new Set(['enquiry_detail', 'ledger_prepared', 'insurance_ledger_emr']);
+function isoOrNull(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+// Returns {start,end} ISO strings/null, or null when invalid.
+function parseTimes(e) {
+  const out = [];
+  for (const k of ['startTime', 'endTime']) {
+    const v = e[k];
+    if (v === undefined || v === null || v === '') { out.push(null); continue; }
+    if (typeof v !== 'string' || v.length > 40 || !/^\d{4}-\d{2}-\d{2}/.test(v)) return null;
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return null;
+    out.push(d.toISOString());
+  }
+  if (out[0] && out[1] && new Date(out[1]) < new Date(out[0])) return null;
+  return { start: out[0], end: out[1] };
+}
+
 async function dbGetActiveEntries(sheets) {
   if (isSupabaseConfigured()) {
-    const list = await readSupabaseTable('v_active_task_entries', 'select=*&order=created_at.asc');
-    return list.map(e => ({
-      id: e.id,
-      createdAt: e.created_at,
-      uid: e.uid,
-      employeeName: e.employee_name,
-      date: normalizeEntryDate(e.date),
-      branch: e.branch,
-      category: e.category,
-      taskId: e.task_id,
-      emr: e.emr || '',
-      remarks: e.remarks || '',
-      quantity: String(e.quantity ?? 0),
-      hours: String(e.hours ?? 0),
-      'Task Date': normalizeEntryDate(e.task_date || e.date),
+    // Read the full append-only ledger in insertion order (`seq`) and resolve
+    // report replacements exactly like the Google Sheets path does. A plain
+    // "task_id != marker" filter would return every superseded submission too.
+    let list;
+    try {
+      list = await readSupabaseTable('app_entries', 'select=*&order=seq.asc');
+    } catch (e) {
+      // Migration 002 (the `seq` column) has not been applied yet. Keep the app
+      // working with the best available order instead of failing every request.
+      console.warn('app_entries.seq missing - run supabase/migrations/002; falling back to created_at', e?.message);
+      list = await readSupabaseTable('app_entries', 'select=*&order=created_at.asc,id.asc');
+    }
+    return activeEntries(list.map(e => {
+      const date = normalizeEntryDate(e.task_date || e.date);
+      return {
+        id: e.id,
+        createdAt: e.created_at,
+        uid: e.uid,
+        employeeName: e.employee_name,
+        date,
+        branch: e.branch,
+        category: e.category,
+        taskId: e.task_id,
+        emr: e.emr || '',
+        remarks: e.remarks || '',
+        quantity: String(e.quantity ?? 0),
+        hours: String(e.hours ?? 0),
+        callerName: e.caller_name || '',
+        callStatus: e.call_status || '',
+        callerPhone: e.caller_phone || '',
+        ...(TIMED_TASKS.has(e.task_id) ? { startTime: isoOrNull(e.start_time), endTime: isoOrNull(e.end_time) } : {}),
+        'Task Date': date,
+      };
     }));
   }
   return activeEntries(await readEntries(sheets));
@@ -133,25 +172,8 @@ async function dbGetActiveEntries(sheets) {
 async function dbSaveEntries(sheets, markerRow, dataRows) {
   if (isSupabaseConfigured()) {
     const toInsert = [];
-    if (markerRow) {
-      toInsert.push({
-        id: markerRow[0],
-        created_at: markerRow[1],
-        uid: markerRow[2],
-        employee_name: markerRow[3],
-        date: markerRow[4],
-        branch: markerRow[5],
-        category: markerRow[6],
-        task_id: markerRow[7],
-        emr: markerRow[8] || '',
-        remarks: markerRow[9] || '',
-        quantity: Number(markerRow[10]) || 0,
-        hours: Number(markerRow[11]) || 0,
-        task_date: markerRow[12] || markerRow[4],
-      });
-    }
-    for (const r of dataRows) {
-      toInsert.push({
+    const toRecord = (r) => {
+      const rec = {
         id: r[0],
         created_at: r[1],
         uid: r[2],
@@ -165,8 +187,24 @@ async function dbSaveEntries(sheets, markerRow, dataRows) {
         quantity: Number(r[10]) || 0,
         hours: Number(r[11]) || 0,
         task_date: r[12] || r[4],
-      });
-    }
+      };
+      // Only enquiry detail rows carry these columns, so every other save keeps
+      // working even before the 002 migration has been applied.
+      if (r[7] === 'enquiry_detail') {
+        rec.caller_name = r[13] || '';
+        rec.call_status = r[14] || '';
+        rec.caller_phone = r[15] || '';
+      }
+      // Optional start/end (positional 16/17); only sent when present so saves
+      // still work before migration 004 is applied.
+      if (TIMED_TASKS.has(r[7])) {
+        if (r[16]) rec.start_time = r[16];
+        if (r[17]) rec.end_time = r[17];
+      }
+      return rec;
+    };
+    if (markerRow) toInsert.push(toRecord(markerRow));
+    for (const r of dataRows) toInsert.push(toRecord(r));
     if (toInsert.length) {
       await insertSupabaseRows('app_entries', toInsert);
     }
@@ -314,6 +352,24 @@ export default async function handler(req,res){
       if(!check(body.branch,body.category))return result(res,403,{error:'Category not assigned'});
       return result(res,200,{tasks:activities(body.branch,body.category)});
     }
+    if(body.action==='report'&&body.date===undefined&&(body.from!==undefined||body.to!==undefined)){
+      // Range report: ADMIN sees all staff (optional branch/category/uid filters);
+      // everyone else is forced to their own uid regardless of request fields.
+      if(!validDate(body.from)||!validDate(body.to)||body.from>body.to)return result(res,400,{error:'Invalid date range'});
+      if((Date.parse(body.to)-Date.parse(body.from))/86400000>366)return result(res,400,{error:'Date range too large (max 366 days)'});
+      const isAdmin=me.role==='ADMIN';
+      const fb=body.branch==null||body.branch===''?null:String(body.branch);
+      const fc=body.category==null||body.category===''?null:String(body.category);
+      const fu=body.uid==null||body.uid===''?null:String(body.uid);
+      if((fb&&!allowedBranches.includes(fb))||(fc&&!allowedCategories.includes(fc)))return result(res,400,{error:'Invalid branch or category'});
+      const all=await dbGetActiveEntries(sheets);
+      const out=all.filter(e=>e.date>=body.from&&e.date<=body.to&&
+        (isAdmin?(!fu||e.uid===fu):e.uid===uid)&&
+        (!fb||e.branch===fb)&&(!fc||e.category===fc)&&
+        (isAdmin||check(e.branch,e.category)))
+        .sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(String(a.createdAt)<String(b.createdAt)?-1:String(a.createdAt)>String(b.createdAt)?1:0));
+      return result(res,200,{entries:out,from:body.from,to:body.to,count:out.length});
+    }
     if(body.action==='report'){
       if(!check(body.branch,body.category))return result(res,403,{error:'Category not assigned'});
       if(!validDate(body.date))return result(res,400,{error:'Invalid reporting date'});
@@ -328,6 +384,8 @@ export default async function handler(req,res){
       const allowed=new Set(activities(body.branch,body.category).map(t=>t.id));
       allowed.add('other_tasks');
       allowed.add('cards_arranged');
+      // Per-call detail rows only belong under the "Enquiries Handled" activity.
+      if(allowed.has('enquiries'))allowed.add('enquiry_detail');
       const rows=[];
       const seenLedger=new Set();
       for(const e of body.entries){
@@ -337,8 +395,27 @@ export default async function handler(req,res){
         const quantity=Number.isFinite(rawQty)?rawQty:NaN;
         const hours=Number.isFinite(rawHours)?rawHours:NaN;
         if(!allowed.has(task)||!Number.isFinite(quantity)||!Number.isFinite(hours)||quantity<0||hours<0||hours>100000||quantity>100000)
-          return result(res,400,{error:'Invalid task quantity or hours'});
+          return result(res,400,{error:`Invalid task quantity or hours (task: ${task.slice(0,60)||'none'}${allowed.has(task)?'':', not allowed for this category'})`});
         const emr=String(e.emr??'').trim(),remarks=String(e.remarks??'').trim();
+        let times={start:null,end:null};
+        if(TIMED_TASKS.has(task)){
+          times=parseTimes(e);
+          if(!times)return result(res,400,{error:'Invalid startTime or endTime'});
+        }
+        if(task==='enquiry_detail'){
+          // One row per enquiry call: number (stored in `emr`), caller, status,
+          // remarks and minutes. Reporting treats these as a breakdown only —
+          // they never add to the activity's quantity or to worked hours.
+          const callerName=String(e.callerName??'').trim(),callStatus=String(e.callStatus??'').trim();
+          const callerPhone=String(e.callerPhone??'').trim();
+          if(callerPhone.length>30||!/^[0-9+\-() ]*$/.test(callerPhone))
+            return result(res,400,{error:'Invalid caller phone'});
+          if(!emr&&!callerName&&!callStatus&&!callerPhone&&!remarks&&hours===0)continue;
+          if(emr.length>20||callerName.length>120||callStatus.length>60||remarks.length>1000)
+            return result(res,400,{error:'Enquiry details too long'});
+          rows.push([crypto.randomUUID(),new Date().toISOString(),uid,me.name,body.date,body.branch,body.category,task,emr,remarks,1,hours,body.date,callerName,callStatus,callerPhone,times.start,times.end]);
+          continue;
+        }
         if(quantity===0&&hours===0&&task!=='ledger_prepared'&&task!=='insurance_ledger_emr'&&!(task==='other_tasks'&&remarks))continue;
         const normalizedQuantity=task==='collection'?quantity:Math.round(quantity);
         if(emr.length>70||remarks.length>1000)return result(res,400,{error:'EMR or remarks too long'});
@@ -348,7 +425,7 @@ export default async function handler(req,res){
           if(seenLedger.has(ledgerKey))return result(res,400,{error:'Duplicate EMR in submission'});
           seenLedger.add(ledgerKey);
         } else if(emr) return result(res,400,{error:'EMR is only accepted for EMR-wise preparation'});
-        rows.push([crypto.randomUUID(),new Date().toISOString(),uid,me.name,body.date,body.branch,body.category,task,emr,remarks,normalizedQuantity,hours,body.date]);
+        rows.push([crypto.randomUUID(),new Date().toISOString(),uid,me.name,body.date,body.branch,body.category,task,emr,remarks,normalizedQuantity,hours,body.date,...(times.start||times.end?['','','',times.start,times.end]:[])]);
       }
       if(body.action==='saveReport'){
         const marker=[crypto.randomUUID(),new Date().toISOString(),uid,me.name,
@@ -366,6 +443,8 @@ export default async function handler(req,res){
       const adminUids=new Set(users.filter(u=>u.role==='ADMIN').map(u=>u.uid));
       const from=validDate(body.from)?body.from:'0000-01-01';
       const to=validDate(body.to)?body.to:'9999-12-31';
+      if(validDate(body.from)&&validDate(body.to)&&(Date.parse(to)-Date.parse(from))/86400000>366)
+        return result(res,400,{error:'Date range too large (max 366 days)'});
       const mine=body.action==='myDashboard';
       return result(res,200,{entries:all.filter(e=>
         e.date>=from&&e.date<=to&&(mine?e.uid===uid:(!adminUids.has(e.uid)&&String(e.employeeName||'').trim().toLowerCase()!=='administrator')))});
