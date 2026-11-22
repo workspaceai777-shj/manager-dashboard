@@ -92,18 +92,43 @@ async function append(sheets,tab,rows) {
 // -----------------------------------------------------------------------------
 // Unified Database Abstraction (Supabase primary, Google Sheets fallback)
 // -----------------------------------------------------------------------------
+let cachedUsers = null;
+let cachedUsersTime = 0;
+let cachedAssignments = null;
+let cachedAssignmentsTime = 0;
+const CACHE_TTL_MS = 60 * 1000;
+
+function invalidateCache() {
+  cachedUsers = null;
+  cachedUsersTime = 0;
+  cachedAssignments = null;
+  cachedAssignmentsTime = 0;
+}
+
 async function dbGetUsers(sheets) {
   if (isSupabaseConfigured()) {
+    const now = Date.now();
+    if (cachedUsers && now - cachedUsersTime < CACHE_TTL_MS) {
+      return cachedUsers;
+    }
     const list = await readSupabaseTable('app_users', 'select=uid,email,name,role,active');
-    return list.map(u => ({ uid: u.uid, email: u.email, name: u.name, role: u.role, active: String(u.active) }));
+    cachedUsers = list.map(u => ({ uid: u.uid, email: u.email, name: u.name, role: u.role, active: String(u.active) }));
+    cachedUsersTime = now;
+    return cachedUsers;
   }
   return await readTab(sheets, TAB_USERS);
 }
 
 async function dbGetAssignments(sheets) {
   if (isSupabaseConfigured()) {
+    const now = Date.now();
+    if (cachedAssignments && now - cachedAssignmentsTime < CACHE_TTL_MS) {
+      return cachedAssignments;
+    }
     const list = await readSupabaseTable('app_assignments', 'select=uid,branch,category,active');
-    return list.map(a => ({ uid: a.uid, branch: a.branch, category: a.category, active: String(a.active) }));
+    cachedAssignments = list.map(a => ({ uid: a.uid, branch: a.branch, category: a.category, active: String(a.active) }));
+    cachedAssignmentsTime = now;
+    return cachedAssignments;
   }
   return await readTab(sheets, TAB_ASSIGN);
 }
@@ -129,19 +154,38 @@ function parseTimes(e) {
   return { start: out[0], end: out[1] };
 }
 
-async function dbGetActiveEntries(sheets) {
+async function dbGetActiveEntries(sheets, filters = {}) {
   if (isSupabaseConfigured()) {
-    // Read the full append-only ledger in insertion order (`seq`) and resolve
-    // report replacements exactly like the Google Sheets path does. A plain
-    // "task_id != marker" filter would return every superseded submission too.
+    const params = [];
+    if (filters.date) {
+      params.push(`task_date=eq.${encodeURIComponent(filters.date)}`);
+    } else {
+      if (filters.from && filters.from !== '0000-01-01') {
+        params.push(`task_date=gte.${encodeURIComponent(filters.from)}`);
+      }
+      if (filters.to && filters.to !== '9999-12-31') {
+        params.push(`task_date=lte.${encodeURIComponent(filters.to)}`);
+      }
+    }
+    if (filters.uid) {
+      params.push(`uid=eq.${encodeURIComponent(filters.uid)}`);
+    }
+    if (filters.branch) {
+      params.push(`branch=eq.${encodeURIComponent(filters.branch)}`);
+    }
+    if (filters.category) {
+      params.push(`category=eq.${encodeURIComponent(filters.category)}`);
+    }
+    params.push('order=seq.asc');
+    const query = params.join('&');
+
     let list;
     try {
-      list = await readSupabaseTable('app_entries', 'select=*&order=seq.asc');
+      list = await readSupabaseTable('app_entries', query);
     } catch (e) {
-      // Migration 002 (the `seq` column) has not been applied yet. Keep the app
-      // working with the best available order instead of failing every request.
-      console.warn('app_entries.seq missing - run supabase/migrations/002; falling back to created_at', e?.message);
-      list = await readSupabaseTable('app_entries', 'select=*&order=created_at.asc,id.asc');
+      console.warn('app_entries query failed, falling back to created_at:', e?.message);
+      const fallbackQuery = params.filter(p => !p.startsWith('order=')).concat('order=created_at.asc,id.asc').join('&');
+      list = await readSupabaseTable('app_entries', fallbackQuery);
     }
     return activeEntries(list.map(e => {
       const date = normalizeEntryDate(e.task_date || e.date);
@@ -337,15 +381,18 @@ export default async function handler(req,res){
     if(!admin.apps.length)return result(res,503,{error:'Firebase Admin credentials not configured'});
     const token=(req.headers.authorization||'').replace(/^Bearer\s+/i,'');
     if(!token)return result(res,401,{error:'Not authenticated'});
-    const verified=await admin.auth().verifyIdToken(token,true);
+    const verified=await admin.auth().verifyIdToken(token);
     const uid=verified.uid;
     const body=req.body||{};
     const useSupabase = isSupabaseConfigured();
     const sheets = useSupabase ? null : sheetClient();
-    const users = await dbGetUsers(sheets);
+    const [users, allAssignments] = await Promise.all([
+      dbGetUsers(sheets),
+      dbGetAssignments(sheets),
+    ]);
     const me=users.find(u=>u.uid===uid && String(u.active).toLowerCase()==='true');
     if(!me)return result(res,403,{error:'No active staff account. Ask an administrator.'});
-    const assignments=(await dbGetAssignments(sheets)).filter(a=>a.uid===uid && String(a.active).toLowerCase()==='true');
+    const assignments=allAssignments.filter(a=>a.uid===uid && String(a.active).toLowerCase()==='true');
     const check=(branch,category)=> allowedBranches.includes(branch)&&allowedCategories.includes(category)&&(
       me.role==='ADMIN'||assignments.some(a=>a.branch===branch&&a.category===category));
     if(body.action==='bootstrap')return result(res,200,{profile:me,assignments:me.role==='ADMIN'?
@@ -364,7 +411,13 @@ export default async function handler(req,res){
       const fc=body.category==null||body.category===''?null:String(body.category);
       const fu=body.uid==null||body.uid===''?null:String(body.uid);
       if((fb&&!allowedBranches.includes(fb))||(fc&&!allowedCategories.includes(fc)))return result(res,400,{error:'Invalid branch or category'});
-      const all=await dbGetActiveEntries(sheets);
+      const all=await dbGetActiveEntries(sheets, {
+        from: body.from,
+        to: body.to,
+        uid: isAdmin ? fu : uid,
+        branch: fb,
+        category: fc,
+      });
       const out=all.filter(e=>e.date>=body.from&&e.date<=body.to&&
         (isAdmin?(!fu||e.uid===fu):e.uid===uid)&&
         (!fb||e.branch===fb)&&(!fc||e.category===fc)&&
@@ -375,7 +428,12 @@ export default async function handler(req,res){
     if(body.action==='report'){
       if(!check(body.branch,body.category))return result(res,403,{error:'Category not assigned'});
       if(!validDate(body.date))return result(res,400,{error:'Invalid reporting date'});
-      const all=await dbGetActiveEntries(sheets);
+      const all=await dbGetActiveEntries(sheets, {
+        date: body.date,
+        uid,
+        branch: body.branch,
+        category: body.category,
+      });
       const mine=all.filter(e=>e.uid===uid&&e.branch===body.branch&&
         e.category===body.category&&e.date===body.date);
       return result(res,200,{entries:mine});
@@ -458,20 +516,23 @@ export default async function handler(req,res){
     if(body.action==='dashboard'||body.action==='myDashboard'){
       if(body.action==='dashboard'&&me.role!=='ADMIN')
         return result(res,403,{error:'Administrator access required'});
-      const all=await dbGetActiveEntries(sheets);
       const adminUids=new Set(users.filter(u=>u.role==='ADMIN').map(u=>u.uid));
       const from=validDate(body.from)?body.from:'0000-01-01';
       const to=validDate(body.to)?body.to:'9999-12-31';
       if(validDate(body.from)&&validDate(body.to)&&(Date.parse(to)-Date.parse(from))/86400000>730)
         return result(res,400,{error:'Date range too large (max 730 days)'});
       const mine=body.action==='myDashboard';
+      const all=await dbGetActiveEntries(sheets, {
+        from: validDate(body.from) ? body.from : undefined,
+        to: validDate(body.to) ? body.to : undefined,
+        uid: mine ? uid : undefined,
+      });
       return result(res,200,{entries:all.filter(e=>
         e.date>=from&&e.date<=to&&(mine?e.uid===uid:(!adminUids.has(e.uid)&&String(e.employeeName||'').trim().toLowerCase()!=='administrator')))});
     }
     if(body.action==='users'){
       if(me.role!=='ADMIN')return result(res,403,{error:'Admin access required'});
-      const allAssign=await dbGetAssignments(sheets);
-      return result(res,200,{users:users.flatMap(u=>allAssign.filter(a=>a.uid===u.uid).map(a=>({...u,branch:a.branch,category:a.category})))});
+      return result(res,200,{users:users.flatMap(u=>allAssignments.filter(a=>a.uid===u.uid).map(a=>({...u,branch:a.branch,category:a.category})))});
     }
 
     if(body.action==='createStaff'){
@@ -495,6 +556,7 @@ export default async function handler(req,res){
           await append(sheets,TAB_USERS,[[created.uid,email,name,role,true]]);
           await append(sheets,TAB_ASSIGN,selected.map(a=>[created.uid,a.branch,a.category,true]));
         }
+        invalidateCache();
       }catch(e){
         // Avoid leaving a valid sign-in account without a matching staff role.
         await admin.auth().updateUser(created.uid,{disabled:true}).catch(()=>{});
@@ -525,6 +587,7 @@ export default async function handler(req,res){
         if(next.length)await sheets.spreadsheets.values.update({spreadsheetId:SHEET_ID,
           range:"'App_Assignments'!A2",valueInputOption:'RAW',requestBody:{values:next}});
       }
+      invalidateCache();
       return result(res,200,{ok:true});
     }
     if(body.action==='upsertUser'){
@@ -549,6 +612,7 @@ export default async function handler(req,res){
         const allAssign=await readTab(sheets,TAB_ASSIGN);
         if(!allAssign.some(x=>x.uid===target&&x.branch===branch&&x.category===category))await append(sheets,TAB_ASSIGN,[[target,branch,category,true]]);
       }
+      invalidateCache();
       return result(res,200,{ok:true});
     }
     return result(res,400,{error:'Unknown action'});

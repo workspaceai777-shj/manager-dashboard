@@ -114,32 +114,42 @@ class TaskLogStyle {
     );
   }
 
+  static final RegExp _ymdRegex = RegExp(r'^(\d{4})[-/](\d{1,2})[-/](\d{1,2})');
+  static final RegExp _dmyRegex = RegExp(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})');
+  static final Map<String, DateTime?> _dateCache = <String, DateTime?>{};
+
   /// Parses entry date whether formatted as YYYY-MM-DD, DD/MM/YYYY, or ISO 8601.
   static DateTime? parseEntryDate(dynamic raw) {
     if (raw == null) return null;
     final s = raw.toString().trim();
     if (s.isEmpty) return null;
-    final ymd = RegExp(r'^(\d{4})[-/](\d{1,2})[-/](\d{1,2})').firstMatch(s);
+    if (_dateCache.containsKey(s)) return _dateCache[s];
+    DateTime? parsed;
+    final ymd = _ymdRegex.firstMatch(s);
     if (ymd != null) {
-      return DateTime(
+      parsed = DateTime(
         int.parse(ymd.group(1)!),
         int.parse(ymd.group(2)!),
         int.parse(ymd.group(3)!),
       );
+    } else {
+      final dmy = _dmyRegex.firstMatch(s);
+      if (dmy != null) {
+        parsed = DateTime(
+          int.parse(dmy.group(3)!),
+          int.parse(dmy.group(2)!),
+          int.parse(dmy.group(1)!),
+        );
+      } else {
+        final dt = DateTime.tryParse(s);
+        if (dt != null) {
+          parsed = DateTime(dt.year, dt.month, dt.day);
+        }
+      }
     }
-    final dmy = RegExp(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})').firstMatch(s);
-    if (dmy != null) {
-      return DateTime(
-        int.parse(dmy.group(3)!),
-        int.parse(dmy.group(2)!),
-        int.parse(dmy.group(1)!),
-      );
-    }
-    final dt = DateTime.tryParse(s);
-    if (dt != null) {
-      return DateTime(dt.year, dt.month, dt.day);
-    }
-    return null;
+    if (_dateCache.length > 2000) _dateCache.clear();
+    _dateCache[s] = parsed;
+    return parsed;
   }
 
   static String dateLabel(DateTime d) => [

@@ -24,26 +24,74 @@ function getBaseUrl() {
   return (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 }
 
-// PostgREST caps a single response (Supabase default: 1000 rows), so every read
-// is paged with the Range header until a short page is returned. Callers that
-// need a stable order must pass an explicit `order=` in queryParams.
+// PostgREST caps a single response (Supabase default: 1000 rows).
+// We request exact count on the first page and fetch any remaining pages
+// concurrently with Promise.all for maximum throughput.
 const PAGE_SIZE = 1000;
 export async function readSupabaseTable(table, queryParams = '') {
   const url = `${getBaseUrl()}/rest/v1/${table}${queryParams ? `?${queryParams}` : ''}`;
-  const all = [];
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: { ...getHeaders(), Range: `${from}-${from + PAGE_SIZE - 1}`, 'Range-Unit': 'items' },
-    });
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Supabase GET ${table} failed (${res.status}): ${errorText}`);
-    }
-    const page = await res.json();
-    all.push(...page);
-    if (page.length < PAGE_SIZE) break;
+  const baseHeaders = {
+    ...getHeaders(),
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Range-Unit': 'items',
+  };
+
+  // Fetch the first page with count=exact to discover total rows
+  const firstRes = await fetch(url, {
+    method: 'GET',
+    headers: { ...baseHeaders, Range: `0-${PAGE_SIZE - 1}`, Prefer: 'count=exact' },
+  });
+  if (!firstRes.ok) {
+    const errorText = await firstRes.text();
+    throw new Error(`Supabase GET ${table} failed (${firstRes.status}): ${errorText}`);
   }
+
+  const firstPage = await firstRes.json();
+  const all = [...firstPage];
+
+  // If there are more items, parse the Content-Range header: e.g. "0-999/6438"
+  const contentRange = firstRes.headers.get('content-range') || '';
+  const match = contentRange.match(/\/(\d+)$/);
+  const total = match ? parseInt(match[1], 10) : (firstPage.length < PAGE_SIZE ? firstPage.length : null);
+
+  if (total && total > PAGE_SIZE) {
+    const pagePromises = [];
+    for (let from = PAGE_SIZE; from < total; from += PAGE_SIZE) {
+      const to = Math.min(from + PAGE_SIZE - 1, total - 1);
+      pagePromises.push(
+        fetch(url, {
+          method: 'GET',
+          headers: { ...baseHeaders, Range: `${from}-${to}` },
+        }).then(async (r) => {
+          if (!r.ok) {
+            const err = await r.text();
+            throw new Error(`Supabase GET ${table} page ${from}-${to} failed (${r.status}): ${err}`);
+          }
+          return r.json();
+        })
+      );
+    }
+    const remainingPages = await Promise.all(pagePromises);
+    for (const page of remainingPages) {
+      all.push(...page);
+    }
+  } else if (!total && firstPage.length === PAGE_SIZE) {
+    // Fallback if total count could not be determined
+    for (let from = PAGE_SIZE; ; from += PAGE_SIZE) {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { ...baseHeaders, Range: `${from}-${from + PAGE_SIZE - 1}` },
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Supabase GET ${table} failed (${res.status}): ${errorText}`);
+      }
+      const page = await res.json();
+      all.push(...page);
+      if (page.length < PAGE_SIZE) break;
+    }
+  }
+
   return all;
 }
 

@@ -568,16 +568,20 @@ class _PortalState extends State<Portal> {
         category = '';
         tasks = [];
       }
-      entries = List.from((await api.request(
-            profile['role'] == 'ADMIN' ? 'dashboard' : 'myDashboard',
-            body: {
-              'from': _date(DateTime.now().subtract(const Duration(days: 360))),
-              'to': _date(DateTime.now().add(const Duration(days: 1))),
-            },
-          ))['entries'] ??
-          []);
-      if (profile['role'] == 'ADMIN') {
-        users = List.from((await api.request('users'))['users'] ?? []);
+      final isAdmin = profile['role'] == 'ADMIN';
+      final results = await Future.wait<dynamic>([
+        api.request(
+          isAdmin ? 'dashboard' : 'myDashboard',
+          body: {
+            'from': _date(DateTime.now().subtract(const Duration(days: 360))),
+            'to': _date(DateTime.now().add(const Duration(days: 1))),
+          },
+        ),
+        if (isAdmin) api.request('users'),
+      ]);
+      entries = List.from((results[0] as Map)['entries'] ?? []);
+      if (isAdmin && results.length > 1) {
+        users = List.from((results[1] as Map)['users'] ?? []);
       }
       error = '';
     } catch (e) {

@@ -47,6 +47,8 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
   DateTime? _localSingleDate;
   DateTimeRange? _localPeriod;
   bool _localTodayOnly = false;
+  final Map<String, int> _sectionLimits = <String, int>{};
+  static const int _defaultSectionLimit = 20;
 
   String get branch => widget.branch ?? _localBranch;
   String get category => widget.category ?? _localCategory;
@@ -670,27 +672,32 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
         DateTime(anchor.year, anchor.month, anchor.day)
             .subtract(Duration(days: i))
     ];
-    bool sameDay(DateTime? a, DateTime b) =>
-        a != null && a.year == b.year && a.month == b.month && a.day == b.day;
-    final recent = widget.records.where((e) {
+    String dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
+    final targetDayKeys = {for (final d in days) dayKey(d)};
+    final recentByDay = <String, List<Map<String, dynamic>>>{};
+    final groups = <String, List<Map<String, dynamic>>>{};
+
+    for (final raw in widget.records) {
+      final e = raw is Map<String, dynamic>
+          ? raw
+          : Map<String, dynamic>.from(raw as Map);
       final name = (e['employeeName'] ?? '').toString().trim();
-      if (name.toLowerCase() == 'administrator') return false;
-      if (branch != 'ALL' && e['branch'] != branch) return false;
-      if (category != 'ALL' && e['category'] != category) return false;
-      if (employee != 'ALL' && name != employee) return false;
-      final d = TaskLogStyle.parseEntryDate(e['Task Date'] ?? e['date']);
-      if (e['taskId'] == 'insurance_ledger_emr' ||
-          e['taskId'] == 'enquiry_detail' ||
-          e['taskId'] == 'emr_updated') {
-        return false;
+      if (name.toLowerCase() == 'administrator') continue;
+      if (branch != 'ALL' && e['branch'] != branch) continue;
+      if (category != 'ALL' && e['category'] != category) continue;
+      if (employee != 'ALL' && name != employee) continue;
+      final taskId = e['taskId'];
+      if (taskId == 'insurance_ledger_emr' ||
+          taskId == 'enquiry_detail' ||
+          taskId == 'emr_updated') {
+        continue;
       }
-      return days.any((x) => sameDay(d, x));
-    }).toList();
-    // staff | branch | category -> rows
-    final groups = <String, List<dynamic>>{};
-    for (final e in recent) {
-      final key =
-          '${(e['employeeName'] ?? '').toString().trim()}|${e['branch']}|${e['category']}';
+      final d = TaskLogStyle.parseEntryDate(e['Task Date'] ?? e['date']);
+      if (d == null) continue;
+      final dk = dayKey(d);
+      if (!targetDayKeys.contains(dk)) continue;
+      recentByDay.putIfAbsent(dk, () => []).add(e);
+      final key = '$name|${e['branch']}|${e['category']}';
       groups.putIfAbsent(key, () => []).add(e);
     }
     final keys = groups.keys.toList()..sort();
@@ -713,19 +720,14 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
           const Text('Each activity compared day by day for every staff member',
               style: TextStyle(color: TaskLogStyle.muted, fontSize: 13)),
           const SizedBox(height: 14),
-          if (recent.isNotEmpty) ...[
+          if (recentByDay.isNotEmpty) ...[
             Wrap(
               spacing: 10,
               runSpacing: 8,
               children: days.map((d) {
-                final dayRows = recent.where((r) => sameDay(
-                    TaskLogStyle.parseEntryDate(r['Task Date'] ?? r['date']),
-                    d));
+                final dayRows = recentByDay[dayKey(d)] ?? const [];
                 final totalH = dayRows.fold<double>(
-                    0.0,
-                    (sum, r) =>
-                        sum +
-                        countedHours(Map<String, dynamic>.from(r as Map)));
+                    0.0, (sum, r) => sum + countedHours(r));
                 final timeText = totalH > 0
                     ? formatDuration(totalH).split(' (').first
                     : '0 min';
@@ -776,12 +778,26 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
             ...keys.map((key) {
               final parts = key.split('|');
               final rows = groups[key]!;
+              final catIds = catalogIds(parts[1], parts[2]);
+              final catSet = catIds.toSet();
+              final seenTasks = <String>{};
+              final groupByDay = <String, List<Map<String, dynamic>>>{};
+              final groupByTaskDay = <String, List<Map<String, dynamic>>>{};
+              for (final r in rows) {
+                final tid = (r['taskId'] ?? '').toString();
+                seenTasks.add(tid);
+                final d =
+                    TaskLogStyle.parseEntryDate(r['Task Date'] ?? r['date']);
+                if (d != null) {
+                  final dk = dayKey(d);
+                  groupByDay.putIfAbsent(dk, () => []).add(r);
+                  groupByTaskDay.putIfAbsent('$tid|$dk', () => []).add(r);
+                }
+              }
               final ids = <String>[
-                ...catalogIds(parts[1], parts[2]).where((id) =>
-                    id != 'insurance_ledger_emr' &&
-                    rows.any((r) => r['taskId'] == id)),
-                ...rows.map((r) => r['taskId'].toString()).toSet().where(
-                    (id) => !catalogIds(parts[1], parts[2]).contains(id)),
+                ...catIds.where((id) =>
+                    id != 'insurance_ledger_emr' && seenTasks.contains(id)),
+                ...seenTasks.where((id) => !catSet.contains(id)),
               ];
               return Container(
                 margin: const EdgeInsets.only(bottom: 14),
@@ -860,16 +876,9 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                                       ),
                                       ...days.map((d) {
                                         final cellVal = _cellText(
-                                            rows
-                                                .where((r) =>
-                                                    r['taskId'] == id &&
-                                                    sameDay(
-                                                        TaskLogStyle
-                                                            .parseEntryDate(
-                                                                r['Task Date'] ??
-                                                                    r['date']),
-                                                        d))
-                                                .toList(),
+                                            groupByTaskDay[
+                                                    '$id|${dayKey(d)}'] ??
+                                                const [],
                                             id,
                                             compact: true);
                                         return SizedBox(
@@ -910,17 +919,10 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                                     ),
                                   ),
                                   ...days.map((d) {
-                                    final dayRows = rows.where((r) => sameDay(
-                                        TaskLogStyle.parseEntryDate(
-                                            r['Task Date'] ?? r['date']),
-                                        d));
-                                    final totalH = dayRows.fold<double>(
-                                        0.0,
-                                        (sum, r) =>
-                                            sum +
-                                            countedHours(
-                                                Map<String, dynamic>.from(
-                                                    r as Map)));
+                                    final dayRows =
+                                        groupByDay[dayKey(d)] ?? const [];
+                                    final totalH = dayRows.fold<double>(0.0,
+                                        (sum, r) => sum + countedHours(r));
                                     final text = totalH > 0
                                         ? (totalH * 60 < 60
                                             ? '${(totalH * 60).round()}m'
@@ -999,16 +1001,9 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                                           ),
                                         ),
                                         ...days.map((d) => cell(_cellText(
-                                            rows
-                                                .where((r) =>
-                                                    r['taskId'] == id &&
-                                                    sameDay(
-                                                        TaskLogStyle
-                                                            .parseEntryDate(
-                                                                r['Task Date'] ??
-                                                                    r['date']),
-                                                        d))
-                                                .toList(),
+                                            groupByTaskDay[
+                                                    '$id|${dayKey(d)}'] ??
+                                                const [],
                                             id))),
                                       ]),
                                 )),
@@ -1031,17 +1026,10 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                                     ),
                                   ),
                                   ...days.map((d) {
-                                    final dayRows = rows.where((r) => sameDay(
-                                        TaskLogStyle.parseEntryDate(
-                                            r['Task Date'] ?? r['date']),
-                                        d));
-                                    final totalH = dayRows.fold<double>(
-                                        0.0,
-                                        (sum, r) =>
-                                            sum +
-                                            countedHours(
-                                                Map<String, dynamic>.from(
-                                                    r as Map)));
+                                    final dayRows =
+                                        groupByDay[dayKey(d)] ?? const [];
+                                    final totalH = dayRows.fold<double>(0.0,
+                                        (sum, r) => sum + countedHours(r));
                                     final text = totalH > 0
                                         ? formatDuration(totalH)
                                             .split(' (')
@@ -1226,6 +1214,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
   @override
   Widget build(BuildContext context) {
     final rows = filteredRows;
+    final narrowItem = MediaQuery.sizeOf(context).width < 820;
     final now = DateTime.now();
     final yesterday = DateTime(now.year, now.month, now.day)
         .subtract(const Duration(days: 1));
@@ -1501,7 +1490,10 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    ...sortedGroupKeys.map((groupKey) {
+                    ...sortedGroupKeys
+                        .take(_sectionLimits[sectionName] ??
+                            _defaultSectionLimit)
+                        .map((groupKey) {
                       final groupRows = staffGroups[groupKey]!;
                       final first = groupRows.first;
                       final empName =
@@ -1639,71 +1631,66 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    LayoutBuilder(builder: (context, itemC) {
-                                      final narrowItem = itemC.maxWidth < 460;
-                                      if (narrowItem) {
-                                        return Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  '$idx. ',
+                                    if (narrowItem)
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                '$idx. ',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  color: TaskLogStyle.teal,
+                                                  fontSize: 13.5,
+                                                ),
+                                              ),
+                                              Expanded(
+                                                child: Text(
+                                                  title,
                                                   style: const TextStyle(
-                                                    fontWeight: FontWeight.w700,
-                                                    color: TaskLogStyle.teal,
+                                                    fontWeight: FontWeight.w600,
                                                     fontSize: 13.5,
+                                                    color: TaskLogStyle.ink,
                                                   ),
                                                 ),
-                                                Expanded(
-                                                  child: Text(
-                                                    title,
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      fontSize: 13.5,
-                                                      color: TaskLogStyle.ink,
-                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                left: 20),
+                                            child: Wrap(
+                                              spacing: 12,
+                                              runSpacing: 4,
+                                              children: [
+                                                Text(
+                                                  qtyStatus,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 12.5,
+                                                    color: TaskLogStyle.ink,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  timeTaken,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 12.5,
+                                                    color: TaskLogStyle.teal,
                                                   ),
                                                 ),
                                               ],
                                             ),
-                                            const SizedBox(height: 6),
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                  left: 20),
-                                              child: Wrap(
-                                                spacing: 12,
-                                                runSpacing: 4,
-                                                children: [
-                                                  Text(
-                                                    qtyStatus,
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      fontSize: 12.5,
-                                                      color: TaskLogStyle.ink,
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    timeTaken,
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      fontSize: 12.5,
-                                                      color: TaskLogStyle.teal,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        );
-                                      }
-                                      return Row(
+                                          ),
+                                        ],
+                                      )
+                                    else
+                                      Row(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
@@ -1744,8 +1731,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                                             ),
                                           ),
                                         ],
-                                      );
-                                    }),
+                                      ),
                                     if (emr.isNotEmpty ||
                                         remarks.isNotEmpty) ...[
                                       const SizedBox(height: 6),
@@ -1795,6 +1781,28 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                         ),
                       );
                     }),
+                    if (sortedGroupKeys.length >
+                        (_sectionLimits[sectionName] ??
+                            _defaultSectionLimit))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Center(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _sectionLimits[sectionName] =
+                                    (_sectionLimits[sectionName] ??
+                                            _defaultSectionLimit) +
+                                        30;
+                              });
+                            },
+                            icon: const Icon(Icons.expand_more),
+                            label: Text(
+                              'Show more reports (${sortedGroupKeys.length - (_sectionLimits[sectionName] ?? _defaultSectionLimit)} remaining)',
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
