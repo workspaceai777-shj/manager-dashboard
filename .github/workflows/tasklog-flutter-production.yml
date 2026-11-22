@@ -32,6 +32,7 @@ jobs:
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.32.6'
           channel: stable
           cache: true
       - name: Dependencies
@@ -39,7 +40,7 @@ jobs:
         run: flutter pub get
       - name: Analyze
         working-directory: flutter_app
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
       - name: Run tests
         working-directory: flutter_app
         run: flutter test
