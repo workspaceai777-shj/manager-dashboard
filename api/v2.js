@@ -356,7 +356,7 @@ export default async function handler(req,res){
       // Range report: ADMIN sees all staff (optional branch/category/uid filters);
       // everyone else is forced to their own uid regardless of request fields.
       if(!validDate(body.from)||!validDate(body.to)||body.from>body.to)return result(res,400,{error:'Invalid date range'});
-      if((Date.parse(body.to)-Date.parse(body.from))/86400000>366)return result(res,400,{error:'Date range too large (max 366 days)'});
+      if((Date.parse(body.to)-Date.parse(body.from))/86400000>730)return result(res,400,{error:'Date range too large (max 730 days)'});
       const isAdmin=me.role==='ADMIN';
       const fb=body.branch==null||body.branch===''?null:String(body.branch);
       const fc=body.category==null||body.category===''?null:String(body.category);
@@ -460,8 +460,8 @@ export default async function handler(req,res){
       const adminUids=new Set(users.filter(u=>u.role==='ADMIN').map(u=>u.uid));
       const from=validDate(body.from)?body.from:'0000-01-01';
       const to=validDate(body.to)?body.to:'9999-12-31';
-      if(validDate(body.from)&&validDate(body.to)&&(Date.parse(to)-Date.parse(from))/86400000>366)
-        return result(res,400,{error:'Date range too large (max 366 days)'});
+      if(validDate(body.from)&&validDate(body.to)&&(Date.parse(to)-Date.parse(from))/86400000>730)
+        return result(res,400,{error:'Date range too large (max 730 days)'});
       const mine=body.action==='myDashboard';
       return result(res,200,{entries:all.filter(e=>
         e.date>=from&&e.date<=to&&(mine?e.uid===uid:(!adminUids.has(e.uid)&&String(e.employeeName||'').trim().toLowerCase()!=='administrator')))});

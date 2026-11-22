@@ -571,8 +571,8 @@ class _PortalState extends State<Portal> {
       entries = List.from((await api.request(
             profile['role'] == 'ADMIN' ? 'dashboard' : 'myDashboard',
             body: {
-              'from': _date(DateTime.now().subtract(const Duration(days: 365))),
-              'to': _date(DateTime.now().add(const Duration(days: 7))),
+              'from': _date(DateTime.now().subtract(const Duration(days: 360))),
+              'to': _date(DateTime.now().add(const Duration(days: 1))),
             },
           ))['entries'] ??
           []);
@@ -705,8 +705,8 @@ class _PortalState extends State<Portal> {
       final response = await api.request(
         manager ? 'dashboard' : 'myDashboard',
         body: {
-          'from': _date(DateTime.now().subtract(const Duration(days: 365))),
-          'to': _date(DateTime.now().add(const Duration(days: 7))),
+          'from': _date(DateTime.now().subtract(const Duration(days: 360))),
+          'to': _date(DateTime.now().add(const Duration(days: 1))),
         },
       );
       if (mounted) {
