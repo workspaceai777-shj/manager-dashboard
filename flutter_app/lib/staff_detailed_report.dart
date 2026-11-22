@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'tasklog_style.dart';
 
+/// Local 'dd MMM, hh:mm a' for a start/end timestamp, '—' if absent.
+String formatRowTime(dynamic v) => _StaffDetailedReportState.formatRowTime(v);
+
 class StaffDetailedReport extends StatefulWidget {
   const StaffDetailedReport({
     super.key,
@@ -150,7 +153,8 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
             'Appointment bookings (in software/excel) & attending calls for appointments',
         'collection': 'Daily collection (AED)',
         'card_details': 'Card date/time, therapist and treatment entered',
-        'patient_cards': 'Arrival, Treatment Charts & Reporting Voucher preparation',
+        'patient_cards':
+            'Arrival, Treatment Charts & Reporting Voucher preparation',
         'charts':
             'Charts prepared for next day including session & rearranged all cards.',
         'cards_arranged':
@@ -175,7 +179,8 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       'registration_excel': 'Patient Registration Excel updated',
       'ledger_prepared': 'Individual Ledgers Prepared (EMR-wise)',
       'ledger_updated': 'Ledger Updated (R4) (including for insurance)',
-      'patient_cards': 'Arrival, Treatment Charts & Reporting Voucher preparation',
+      'patient_cards':
+          'Arrival, Treatment Charts & Reporting Voucher preparation',
       'charts':
           'Charts prepared for next day including session & rearranged all cards.',
       'cards_arranged':
@@ -197,8 +202,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       'accounts_collection_check':
           'Daily Collections Checked — White Fox and Ontario',
       'accounts_dha_attendance': 'DHA Attendance Records Updated',
-      'accounts_insurance_ledgers':
-          'Individual ledgers for insurance showed',
+      'accounts_insurance_ledgers': 'Individual ledgers for insurance showed',
       'accounts_petty_cash': 'Petty Cash Filing Completed',
       'accounts_month_end':
           'Month-End Collection Closing and Bank Deposit Handover',
@@ -624,8 +628,8 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       margin: const EdgeInsets.only(bottom: 28),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient:
-            const LinearGradient(colors: [Color(0xFF20334F), Color(0xFF132138)]),
+        gradient: const LinearGradient(
+            colors: [Color(0xFF20334F), Color(0xFF132138)]),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: TaskLogStyle.teal.withValues(alpha: 0.45)),
       ),
@@ -695,8 +699,8 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       margin: const EdgeInsets.only(bottom: 28),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient:
-            const LinearGradient(colors: [Color(0xFF20334F), Color(0xFF132138)]),
+        gradient: const LinearGradient(
+            colors: [Color(0xFF20334F), Color(0xFF132138)]),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: TaskLogStyle.border),
       ),
@@ -706,8 +710,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
           const Text('Last 3 days — activity comparison',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          const Text(
-              'Each activity compared day by day for every staff member',
+          const Text('Each activity compared day by day for every staff member',
               style: TextStyle(color: TaskLogStyle.muted, fontSize: 13)),
           const SizedBox(height: 14),
           if (recent.isNotEmpty) ...[
@@ -777,10 +780,8 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                 ...catalogIds(parts[1], parts[2]).where((id) =>
                     id != 'insurance_ledger_emr' &&
                     rows.any((r) => r['taskId'] == id)),
-                ...rows
-                    .map((r) => r['taskId'].toString())
-                    .toSet()
-                    .where((id) => !catalogIds(parts[1], parts[2]).contains(id)),
+                ...rows.map((r) => r['taskId'].toString()).toSet().where(
+                    (id) => !catalogIds(parts[1], parts[2]).contains(id)),
               ];
               return Container(
                 margin: const EdgeInsets.only(bottom: 14),
@@ -841,9 +842,11 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                             ),
                             const Divider(height: 12),
                             ...ids.map((id) => Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 4),
                                   child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     children: [
                                       Expanded(
                                         child: Text(
@@ -861,9 +864,10 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                                                 .where((r) =>
                                                     r['taskId'] == id &&
                                                     sameDay(
-                                                        TaskLogStyle.parseEntryDate(
-                                                            r['Task Date'] ??
-                                                                r['date']),
+                                                        TaskLogStyle
+                                                            .parseEntryDate(
+                                                                r['Task Date'] ??
+                                                                    r['date']),
                                                         d))
                                                 .toList(),
                                             id,
@@ -969,7 +973,8 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                           children: [
                             Row(children: [
                               const SizedBox(width: actW),
-                              ...days.map((d) => cell(dateLabel(d), head: true)),
+                              ...days
+                                  .map((d) => cell(dateLabel(d), head: true)),
                             ]),
                             const Divider(height: 12),
                             ...ids.map((id) => Padding(
@@ -998,9 +1003,10 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                                                 .where((r) =>
                                                     r['taskId'] == id &&
                                                     sameDay(
-                                                        TaskLogStyle.parseEntryDate(
-                                                            r['Task Date'] ??
-                                                                r['date']),
+                                                        TaskLogStyle
+                                                            .parseEntryDate(
+                                                                r['Task Date'] ??
+                                                                    r['date']),
                                                         d))
                                                 .toList(),
                                             id))),
@@ -1009,11 +1015,9 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                             const Divider(
                                 height: 14, color: TaskLogStyle.border),
                             Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 6),
+                              padding: const EdgeInsets.symmetric(vertical: 6),
                               child: Row(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   SizedBox(
                                     width: actW,
@@ -1056,6 +1060,74 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                 ),
               );
             }),
+        ],
+      ),
+    );
+  }
+
+  static const _mon = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
+  ];
+
+  /// Local 'dd MMM, hh:mm a' or '—' when absent/unparseable.
+  static String formatRowTime(dynamic v) {
+    if (v == null) return '—';
+    final d = DateTime.tryParse(v.toString())?.toLocal();
+    if (d == null) return '—';
+    final h12 = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    return '${d.day.toString().padLeft(2, '0')} ${_mon[d.month - 1]}, '
+        '${h12.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')} '
+        '${d.hour < 12 ? 'AM' : 'PM'}';
+  }
+
+  /// Table-style identifier + start/end block for an enquiry or EMR row.
+  Widget rowTimeTable(Map<String, dynamic> d,
+      {required String idLabel, required String id, String? name}) {
+    Widget cell(String label, String value) => Container(
+          constraints: const BoxConstraints(minWidth: 120),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: TaskLogStyle.muted)),
+              Text(value,
+                  style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: TaskLogStyle.ink)),
+            ],
+          ),
+        );
+    return Container(
+      key: const ValueKey('row-time-table'),
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: TaskLogStyle.border),
+      ),
+      child: Wrap(
+        children: [
+          cell(idLabel, id.isEmpty ? '—' : id),
+          if (name != null) cell('Caller', name.isEmpty ? '—' : name),
+          cell('Start time', formatRowTime(d['startTime'])),
+          cell('End time', formatRowTime(d['endTime'])),
         ],
       ),
     );
@@ -1129,10 +1201,15 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                               fontSize: 12.5, color: TaskLogStyle.muted)),
                     ],
                   ),
+                  rowTimeTable(d,
+                      idLabel: 'Call No.',
+                      id: (d['emr'] ?? '').toString().trim(),
+                      name: (d['callerName'] ?? '').toString().trim()),
                   if ((d['remarks'] ?? '').toString().trim().isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
-                      child: Text('Remarks: ${(d['remarks']).toString().trim()}',
+                      child: Text(
+                          'Remarks: ${(d['remarks']).toString().trim()}',
                           style: const TextStyle(
                               fontSize: 12,
                               color: TaskLogStyle.muted,
@@ -1150,7 +1227,8 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
   Widget build(BuildContext context) {
     final rows = filteredRows;
     final now = DateTime.now();
-    final yesterday = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
+    final yesterday = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 1));
     final isYesterday = !todayOnly &&
         singleDate != null &&
         singleDate!.year == yesterday.year &&
@@ -1690,16 +1768,24 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                                         ),
                                       ),
                                     ],
+                                    if (taskId == 'ledger_prepared' ||
+                                        taskId == 'insurance_ledger_emr') ...[
+                                      Padding(
+                                        padding:
+                                            const EdgeInsets.only(left: 20),
+                                        child: rowTimeTable(r,
+                                            idLabel: 'EMR No.', id: emr),
+                                      ),
+                                    ],
                                     if (r['_enquiryDetails'] is List &&
                                         (r['_enquiryDetails'] as List)
                                             .isNotEmpty) ...[
                                       const SizedBox(height: 8),
-                                      enquiryDetailsList(
-                                          (r['_enquiryDetails'] as List)
-                                              .map((e) =>
-                                                  Map<String, dynamic>.from(
-                                                      e as Map))
-                                              .toList()),
+                                      enquiryDetailsList((r['_enquiryDetails']
+                                              as List)
+                                          .map((e) => Map<String, dynamic>.from(
+                                              e as Map))
+                                          .toList()),
                                     ],
                                   ],
                                 ),

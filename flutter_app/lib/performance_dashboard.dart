@@ -683,7 +683,8 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
             }),
     );
     final now = DateTime.now();
-    final yesterday = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
+    final yesterday = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 1));
     final isYesterday = !todayOnly &&
         singleDate != null &&
         singleDate!.year == yesterday.year &&
@@ -828,7 +829,8 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
               formatDuration(emp.value), Icons.schedule, chartColors[3])),
         ],
         if (branch != 'ALL')
-          tile('Collection (AED)',
+          tile(
+              'Collection (AED)',
               (totals['collection'] ?? 0).toStringAsFixed(2),
               Icons.account_balance_wallet_outlined,
               chartColors[2])

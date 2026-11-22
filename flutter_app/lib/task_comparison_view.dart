@@ -98,11 +98,10 @@ class _ActivityGroup {
   double get totalQty =>
       staffMap.values.fold(0.0, (sum, m) => sum + m.quantity);
 
-  double get totalHours =>
-      staffMap.values.fold(0.0, (sum, m) => sum + m.hours);
+  double get totalHours => staffMap.values.fold(0.0, (sum, m) => sum + m.hours);
 
-  double get maxQty => staffMap.values.fold(
-      0.0, (max, m) => m.quantity > max ? m.quantity : max);
+  double get maxQty => staffMap.values
+      .fold(0.0, (max, m) => m.quantity > max ? m.quantity : max);
 
   double get maxHours =>
       staffMap.values.fold(0.0, (max, m) => m.hours > max ? m.hours : max);
@@ -442,7 +441,8 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
 
   Widget _buildFilterBar() {
     final now = DateTime.now();
-    final yesterday = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
+    final yesterday = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 1));
     final isYesterday = !todayOnly &&
         singleDate != null &&
         singleDate!.year == yesterday.year &&
@@ -451,110 +451,107 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
     final isOtherSingleDate = !todayOnly && singleDate != null && !isYesterday;
 
     return Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          _buildPicker('Branch', branch, options('branch'),
-              (v) => _setFilter(branch: v)),
-          _buildPicker('Category', category, options('category'),
-              (v) => _setFilter(category: v)),
-          _buildPicker('Employee', employee, options('employeeName'),
-              (v) => _setFilter(employee: v)),
-          FilledButton.icon(
-            onPressed: () => _setFilter(todayOnly: true),
-            style: FilledButton.styleFrom(
-              backgroundColor:
-                  todayOnly ? TaskLogStyle.teal : TaskLogStyle.surface,
-              foregroundColor:
-                  todayOnly ? const Color(0xFF061425) : TaskLogStyle.ink,
-              side: const BorderSide(color: TaskLogStyle.border),
-            ),
-            icon: const Icon(Icons.event_available, size: 18),
-            label: Text('Today — ${dateLabel(now)}'),
+      spacing: 10,
+      runSpacing: 10,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _buildPicker(
+            'Branch', branch, options('branch'), (v) => _setFilter(branch: v)),
+        _buildPicker('Category', category, options('category'),
+            (v) => _setFilter(category: v)),
+        _buildPicker('Employee', employee, options('employeeName'),
+            (v) => _setFilter(employee: v)),
+        FilledButton.icon(
+          onPressed: () => _setFilter(todayOnly: true),
+          style: FilledButton.styleFrom(
+            backgroundColor:
+                todayOnly ? TaskLogStyle.teal : TaskLogStyle.surface,
+            foregroundColor:
+                todayOnly ? const Color(0xFF061425) : TaskLogStyle.ink,
+            side: const BorderSide(color: TaskLogStyle.border),
           ),
-          FilledButton.icon(
-            onPressed: () => _setFilter(singleDate: yesterday),
-            style: FilledButton.styleFrom(
-              backgroundColor:
-                  isYesterday ? TaskLogStyle.teal : TaskLogStyle.surface,
-              foregroundColor:
-                  isYesterday ? const Color(0xFF061425) : TaskLogStyle.ink,
-              side: const BorderSide(color: TaskLogStyle.border),
-            ),
-            icon: const Icon(Icons.history, size: 18),
-            label: Text('Yesterday — ${dateLabel(yesterday)}'),
+          icon: const Icon(Icons.event_available, size: 18),
+          label: Text('Today — ${dateLabel(now)}'),
+        ),
+        FilledButton.icon(
+          onPressed: () => _setFilter(singleDate: yesterday),
+          style: FilledButton.styleFrom(
+            backgroundColor:
+                isYesterday ? TaskLogStyle.teal : TaskLogStyle.surface,
+            foregroundColor:
+                isYesterday ? const Color(0xFF061425) : TaskLogStyle.ink,
+            side: const BorderSide(color: TaskLogStyle.border),
           ),
-          OutlinedButton.icon(
-            onPressed: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: singleDate ?? now,
-                firstDate: DateTime(2024),
-                lastDate: DateTime(2035),
-              );
-              if (picked != null) {
-                _setFilter(singleDate: picked);
-              }
-            },
-            style: OutlinedButton.styleFrom(
-              backgroundColor: isOtherSingleDate
-                  ? TaskLogStyle.teal.withValues(alpha: 0.15)
-                  : null,
-              side: BorderSide(
-                color: isOtherSingleDate
-                    ? TaskLogStyle.teal
-                    : TaskLogStyle.border,
-              ),
-            ),
-            icon: const Icon(Icons.calendar_month, size: 18),
-            label: Text(
-              isOtherSingleDate ? dateLabel(singleDate!) : 'Choose date',
-              style: TextStyle(
-                color:
-                    isOtherSingleDate ? TaskLogStyle.teal : TaskLogStyle.ink,
-                fontWeight:
-                    isOtherSingleDate ? FontWeight.w700 : FontWeight.w500,
-              ),
+          icon: const Icon(Icons.history, size: 18),
+          label: Text('Yesterday — ${dateLabel(yesterday)}'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: singleDate ?? now,
+              firstDate: DateTime(2024),
+              lastDate: DateTime(2035),
+            );
+            if (picked != null) {
+              _setFilter(singleDate: picked);
+            }
+          },
+          style: OutlinedButton.styleFrom(
+            backgroundColor: isOtherSingleDate
+                ? TaskLogStyle.teal.withValues(alpha: 0.15)
+                : null,
+            side: BorderSide(
+              color:
+                  isOtherSingleDate ? TaskLogStyle.teal : TaskLogStyle.border,
             ),
           ),
-          OutlinedButton.icon(
-            onPressed: () async {
-              final picked = await showDateRangePicker(
-                context: context,
-                firstDate: DateTime(2024),
-                lastDate: DateTime(2035),
-                initialDateRange: period,
-              );
-              if (picked != null) {
-                _setFilter(period: picked);
-              }
-            },
-            style: OutlinedButton.styleFrom(
-              backgroundColor: period != null
-                  ? TaskLogStyle.teal.withValues(alpha: 0.15)
-                  : null,
-              side: BorderSide(
-                color: period != null ? TaskLogStyle.teal : TaskLogStyle.border,
-              ),
-            ),
-            icon: const Icon(Icons.date_range, size: 18),
-            label: Text(
-              period != null
-                  ? '${dateLabel(period!.start)} — ${dateLabel(period!.end)}'
-                  : 'Choose date range',
-              style: TextStyle(
-                color: period != null ? TaskLogStyle.teal : TaskLogStyle.ink,
-                fontWeight: period != null ? FontWeight.w700 : FontWeight.w500,
-              ),
+          icon: const Icon(Icons.calendar_month, size: 18),
+          label: Text(
+            isOtherSingleDate ? dateLabel(singleDate!) : 'Choose date',
+            style: TextStyle(
+              color: isOtherSingleDate ? TaskLogStyle.teal : TaskLogStyle.ink,
+              fontWeight: isOtherSingleDate ? FontWeight.w700 : FontWeight.w500,
             ),
           ),
-          TextButton(
-            onPressed: () => _setFilter(clearDates: true),
-            child: const Text('All loaded dates'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () async {
+            final picked = await showDateRangePicker(
+              context: context,
+              firstDate: DateTime(2024),
+              lastDate: DateTime(2035),
+              initialDateRange: period,
+            );
+            if (picked != null) {
+              _setFilter(period: picked);
+            }
+          },
+          style: OutlinedButton.styleFrom(
+            backgroundColor: period != null
+                ? TaskLogStyle.teal.withValues(alpha: 0.15)
+                : null,
+            side: BorderSide(
+              color: period != null ? TaskLogStyle.teal : TaskLogStyle.border,
+            ),
           ),
-        ],
-      );
+          icon: const Icon(Icons.date_range, size: 18),
+          label: Text(
+            period != null
+                ? '${dateLabel(period!.start)} — ${dateLabel(period!.end)}'
+                : 'Choose date range',
+            style: TextStyle(
+              color: period != null ? TaskLogStyle.teal : TaskLogStyle.ink,
+              fontWeight: period != null ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+        ),
+        TextButton(
+          onPressed: () => _setFilter(clearDates: true),
+          child: const Text('All loaded dates'),
+        ),
+      ],
+    );
   }
 
   Widget _buildExecutiveOverview(
@@ -579,8 +576,8 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
       }
     }
 
-    final maxStaffTasks = staffTotalTasks.values.fold<double>(
-        0.0, (max, v) => v > max ? v : max);
+    final maxStaffTasks =
+        staffTotalTasks.values.fold<double>(0.0, (max, v) => v > max ? v : max);
 
     return Container(
       width: double.infinity,
@@ -603,7 +600,8 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: TaskLogStyle.teal.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
@@ -697,8 +695,9 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
               final staffName = entry.key;
               final taskQty = entry.value;
               final hoursVal = staffTotalHours[staffName] ?? 0.0;
-              final ratio =
-                  maxStaffTasks > 0 ? (taskQty / maxStaffTasks).clamp(0.05, 1.0) : 0.05;
+              final ratio = maxStaffTasks > 0
+                  ? (taskQty / maxStaffTasks).clamp(0.05, 1.0)
+                  : 0.05;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: LayoutBuilder(builder: (context, constraints) {
@@ -772,8 +771,8 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
         ),
         child: Text(
           text,
-          style: TextStyle(
-              fontSize: 11.5, fontWeight: FontWeight.w600, color: bg),
+          style:
+              TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: bg),
         ),
       );
 
@@ -808,8 +807,8 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
               children: [
                 Text(
                   title,
-                  style:
-                      const TextStyle(fontSize: 10.5, color: TaskLogStyle.muted),
+                  style: const TextStyle(
+                      fontSize: 10.5, color: TaskLogStyle.muted),
                 ),
                 Text(
                   value,
@@ -897,8 +896,8 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
                             color: TaskLogStyle.teal.withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(
-                                color: TaskLogStyle.teal
-                                    .withValues(alpha: 0.6)),
+                                color:
+                                    TaskLogStyle.teal.withValues(alpha: 0.6)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1076,7 +1075,8 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: TaskLogStyle.teal.withValues(alpha: 0.12),
+                                color:
+                                    TaskLogStyle.teal.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
@@ -1177,8 +1177,8 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
                             color: const Color(0xFF0A1524),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                                color: TaskLogStyle.teal
-                                    .withValues(alpha: 0.3)),
+                                color:
+                                    TaskLogStyle.teal.withValues(alpha: 0.3)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,0 +1,50 @@
+id,section,category,branch,name,measurement,display_order
+registrations,Reception & Patient Management,FRONT DESK,ALL,Patient Registrations (including treatment chart and case sheet),Quantity + Hours,1
+appointments,Reception & Patient Management,FRONT DESK,ALL,Appointments Booked,Quantity + Hours,2
+calls,Reception & Patient Management,FRONT DESK,ALL,Calls Attended,Quantity + Hours,3
+whatsapp,Reception & Patient Management,FRONT DESK,ALL,WhatsApp Enquiries Replied,Quantity + Hours,4
+confirmations,Reception & Patient Management,FRONT DESK,ALL,Confirmation Messages Sent,Quantity + Hours,5
+consultations,Reception & Patient Management,FRONT DESK,ALL,Consultations Coordinated,Quantity + Hours,6
+enquiries,Reception & Patient Management,FRONT DESK,ALL,Enquiries Handled,Quantity + Hours,7
+registration_excel,Reception & Patient Management,FRONT DESK,ALL,Patient Registration Excel updated,Quantity + Hours,8
+ledger_updated,Ledger & Documentation,FRONT DESK,ALL,Ledger Updated (R4) (including for insurance),Quantity + Hours,9
+patient_cards,Ledger & Documentation,FRONT DESK,ALL,Patient Cards Prepared,Quantity + Hours,10
+charts,Ledger & Documentation,FRONT DESK,ALL,Charts Prepared,Quantity + Hours,11
+patient_documents,Ledger & Documentation,FRONT DESK,ALL,Patient Doc Folder Updated,Quantity + Hours,12
+appointment_excel,Ledger & Documentation,FRONT DESK,ALL,Appointment Excel Records Updated,Quantity + Hours,14
+next_day_due,Ledger & Documentation,FRONT DESK,ALL,Next Day Appointment Due Checked,Quantity + Hours,15
+invoices,Insurance & Finance,FRONT DESK,ALL,Insurance Invoices Prepared,Quantity + Hours,16
+insurance_docs,Insurance & Finance,FRONT DESK,ALL,Insurance Documents Sent,Quantity + Hours,17
+collection,Insurance & Finance,FRONT DESK,ALL,Daily Collection (AED),AED + Hours,18
+insurance_datewise,Insurance & Finance,FRONT DESK,ALL,Insurance Datewise Updated,Quantity + Hours,19
+other_tasks,General,FRONT DESK,ALL,Other Assigned Tasks,Hours Only,20
+ledger_prepared,Ledger & Documentation,FRONT DESK,ALL,Individual Ledgers Prepared (EMR-wise),EMR Entry + Time,21
+ins_portal_submission,Insurance & Finance,INSURANCE USER,ALL,Portal Claim Submission & Verification,Quantity + Hours,1
+ins_resubmission,Insurance & Finance,INSURANCE USER,ALL,Resubmission / Denial Management,Quantity + Hours,2
+ins_reconciliation,Insurance & Finance,INSURANCE USER,ALL,Remittance & Payment Reconciliation,Quantity + Hours,3
+ins_prior_auth,Insurance & Finance,INSURANCE USER,ALL,Prior Authorization Requests,Quantity + Hours,4
+ins_eligibility,Insurance & Finance,INSURANCE USER,ALL,Eligibility & Benefits Verification,Quantity + Hours,5
+insurance_ledger_emr,Ledger & Documentation,INSURANCE USER,ALL,Insurance EMR Ledger Updation,EMR Entry + Time,6
+accounts_daily_sales_reconciliation,Insurance & Finance,ACCOUNTS,ALL,Daily Sales Report Reconciliation,Yes / No + Hours,1
+accounts_bank_reconciliation,Insurance & Finance,ACCOUNTS,ALL,Bank Account Statement Reconciliation,Yes / No + Hours,2
+accounts_insurance_ledgers,Insurance & Finance,ACCOUNTS,ALL,Individual ledgers for insurance showed,Yes / No + Hours,3
+accounts_petty_cash,Insurance & Finance,ACCOUNTS,ALL,Petty Cash Filing Completed,Yes / No + Hours,4
+accounts_month_end,Insurance & Finance,ACCOUNTS,ALL,Month-End Collection Closing and Bank Deposit Handover,Yes / No + Hours,5
+accounts_reception,Reception & Patient Management,ACCOUNTS,ALL,Reception Duties and Reporting Vouchers,Yes / No + Hours,6
+accounts_zoho_updation,Ledger & Documentation,ACCOUNTS,ALL,Zoho updation,Yes / No + Hours,7
+accounts_vat_excel_ontario,Insurance & Finance,ACCOUNTS,ALL,Vat excel entry Ontario,Yes / No + Hours,8
+accounts_vat_filing_ontario,Insurance & Finance,ACCOUNTS,ALL,Vat filing Ontario,Yes / No + Hours,9
+accounts_vat_excel_whitefox,Insurance & Finance,ACCOUNTS,ALL,Vat excel updation White fox,Yes / No + Hours,10
+accounts_vat_filing_whitefox,Insurance & Finance,ACCOUNTS,ALL,Vat filing White fox,Yes / No + Hours,11
+accounts_cash_in_hand_checking,Insurance & Finance,ACCOUNTS,ALL,Cash in hand checking,Yes / No + Hours,12
+accounts_staff_attendance,Ledger & Documentation,ACCOUNTS,ALL,Staff attendance Ontario and Whitefox,Yes / No + Hours,13
+accounts_towel_import_invoice,Insurance & Finance,ACCOUNTS,ALL,"Towel import invoice preparation, cash collect from customer and excel update",Yes / No + Hours,14
+accounts_month_end_closing_deposit,Insurance & Finance,ACCOUNTS,ALL,Month end closing and cash handover for deposit,Yes / No + Hours,16
+accounts_whitefox_consignment_sale,Insurance & Finance,ACCOUNTS,ALL,White fox Consignment basis sale checking and update,Yes / No + Hours,17
+accounts_petty_cash_voucher_entry,Insurance & Finance,ACCOUNTS,ALL,Petty cash voucher entry and filing,Yes / No + Hours,18
+accounts_petty_cash_excel,Insurance & Finance,ACCOUNTS,ALL,Petty cash excel,Yes / No + Hours,19
+accounts_monthly_collection_excel,Insurance & Finance,ACCOUNTS,ALL,Monthly collection excel,Yes / No + Hours,20
+accounts_purchase_request_month,Insurance & Finance,ACCOUNTS,ALL,Purchase request for one month,Yes / No + Hours,21
+doctors_consultations,Reception & Patient Management,DOCTOR'S ZONE,ALL,Number of Consultations,Quantity + Hours,1
+doctors_follow_ups,Reception & Patient Management,DOCTOR'S ZONE,ALL,Number of Follow-ups,Quantity + Hours,2
+doctors_treatments_supervised,Reception & Patient Management,DOCTOR'S ZONE,ALL,Number of Treatments Supervised,Quantity + Hours,3

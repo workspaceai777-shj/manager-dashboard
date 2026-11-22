@@ -170,7 +170,8 @@ class TaskLogStyle {
             'Appointment bookings (in software/excel) & attending calls for appointments',
         'collection': 'Daily collection (AED)',
         'card_details': 'Card date/time, therapist and treatment entered',
-        'patient_cards': 'Arrival, Treatment Charts & Reporting Voucher preparation',
+        'patient_cards':
+            'Arrival, Treatment Charts & Reporting Voucher preparation',
         'charts':
             'Charts prepared for next day including session & rearranged all cards.',
         'cards_arranged':
@@ -195,7 +196,8 @@ class TaskLogStyle {
       'registration_excel': 'Patient Registration Excel updated',
       'ledger_prepared': 'Individual Ledgers Prepared (EMR-wise)',
       'ledger_updated': 'Ledger Updated (R4) (including for insurance)',
-      'patient_cards': 'Arrival, Treatment Charts & Reporting Voucher preparation',
+      'patient_cards':
+          'Arrival, Treatment Charts & Reporting Voucher preparation',
       'charts':
           'Charts prepared for next day including session & rearranged all cards.',
       'cards_arranged':
@@ -217,8 +219,7 @@ class TaskLogStyle {
       'accounts_collection_check':
           'Daily Collections Checked — White Fox and Ontario',
       'accounts_dha_attendance': 'DHA Attendance Records Updated',
-      'accounts_insurance_ledgers':
-          'Individual ledgers for insurance showed',
+      'accounts_insurance_ledgers': 'Individual ledgers for insurance showed',
       'accounts_month_end':
           'Month-End Collection Closing and Bank Deposit Handover',
       'accounts_reception': 'Reception Duties and Reporting Vouchers',

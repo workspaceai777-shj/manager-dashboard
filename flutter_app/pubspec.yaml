@@ -11,6 +11,8 @@ dependencies:
   firebase_auth: ^5.7.0
   http: ^1.5.0
   fl_chart: ^0.70.2
+  pdf: ^3.11.3
+  printing: ^5.14.3
 dev_dependencies:
   flutter_test:
     sdk: flutter

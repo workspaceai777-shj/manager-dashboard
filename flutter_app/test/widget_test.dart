@@ -130,7 +130,10 @@ class FakeStaffApi extends StaffApi {
           'name': 'New patient registration and cards prepared'
         },
         {'id': 'collection', 'name': 'Daily collection (AED)'},
-        {'id': 'ledger_updated', 'name': 'Ledger Updated (R4) (including for insurance)'},
+        {
+          'id': 'ledger_updated',
+          'name': 'Ledger Updated (R4) (including for insurance)'
+        },
         {
           'id': 'ledger_prepared',
           'name': 'Individual Ledgers Prepared (EMR-wise)'
@@ -148,7 +151,10 @@ class FakeStaffApi extends StaffApi {
         'id': 'ledger_prepared',
         'name': 'Individual Ledgers Prepared (EMR-wise)'
       },
-      {'id': 'ledger_updated', 'name': 'Ledger Updated (R4) (including for insurance)'},
+      {
+        'id': 'ledger_updated',
+        'name': 'Ledger Updated (R4) (including for insurance)'
+      },
       {'id': 'collection', 'name': 'Daily Collection (AED)'},
     ];
   }
@@ -438,8 +444,8 @@ void main() {
     await tester.tap(find.text('ONT-BR1 — ACCOUNTS').last);
     await tester.pumpAndSettle();
     expect(find.text('R4 Individual Ledgers Created'), findsNothing);
-    expect(find.text('Individual ledgers for insurance showed'),
-        findsOneWidget);
+    expect(
+        find.text('Individual ledgers for insurance showed'), findsOneWidget);
     expect(find.text('Petty Cash Filing Completed'), findsNothing);
     expect(find.text('Monthly collection excel'), findsNothing);
     expect(find.text('Zoho updation'), findsOneWidget);
@@ -478,16 +484,42 @@ void main() {
       of: find.text('Ledger Updated (R4) (including for insurance)'),
       matching: find.byType(Card),
     );
+    Future<void> addEmrRows(int from, int to) async {
+      for (var i = from; i < to; i++) {
+        await tester.ensureVisible(find.text('Add EMR'));
+        await tester.tap(find.text('Add EMR'));
+        await tester.pumpAndSettle();
+        final emrField = find.widgetWithText(TextField, 'EMR No.').at(i);
+        await tester.ensureVisible(emrField);
+        await tester.enterText(emrField, 'E$i');
+        if (i == 0) {
+          await tester.enterText(
+              find.descendant(
+                  of: find
+                      .ancestor(of: emrField, matching: find.byType(Card))
+                      .first,
+                  matching: find.widgetWithText(TextField, 'Minutes')),
+              '90');
+        }
+        await tester.pumpAndSettle();
+      }
+    }
+
+    // Activity card is read-only and derived from the EMR-wise rows
+    expect(find.descendant(of: ledgerCard, matching: find.byType(TextField)),
+        findsNothing);
+    await addEmrRows(0, 5);
     final qtyField = find.descendant(
-      of: ledgerCard,
-      matching: find.widgetWithText(TextField, 'Quantity'),
-    );
-    final hoursField = find.descendant(
-      of: ledgerCard,
-      matching: find.widgetWithText(TextField, 'Minutes'),
-    );
-    await tester.enterText(qtyField, '5');
-    await tester.enterText(hoursField, '90');
+        of: ledgerCard,
+        matching: find.byKey(const ValueKey('ledger-summary-Quantity')));
+    expect(tester.widget<Text>(qtyField).data, '5');
+    expect(
+        tester
+            .widget<Text>(find.descendant(
+                of: ledgerCard,
+                matching: find.byKey(const ValueKey('ledger-summary-Minutes'))))
+            .data,
+        '90');
     await tester.ensureVisible(find.text('Save daily report'));
     await tester.tap(find.text('Save daily report'));
     await tester.pumpAndSettle();
@@ -502,8 +534,8 @@ void main() {
     );
 
     // Edit the saved report from 5 to 8 and resave
-    await tester.ensureVisible(qtyField);
-    await tester.enterText(qtyField, '8');
+    await addEmrRows(5, 8);
+    expect(tester.widget<Text>(qtyField).data, '8');
     await tester.ensureVisible(find.text('Save daily report'));
     await tester.tap(find.text('Save daily report'));
     await tester.pumpAndSettle();
@@ -551,8 +583,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Staff detailed activity reports'), findsOneWidget);
       expect(find.text('SECTION: FRONT DESK'), findsOneWidget);
-      expect(
-          find.text('Ledger Updated (R4) (including for insurance)'), findsWidgets);
+      expect(find.text('Ledger Updated (R4) (including for insurance)'),
+          findsWidgets);
 
       expect(find.text('Settings'), findsWidgets);
       await tester.tap(find.byIcon(Icons.settings));
@@ -734,7 +766,8 @@ void main() {
       expect(find.text('Prince'), findsWidgets);
 
       // Verify ledger activities are merged as one, showing EMR entries and no duplicate activity
-      expect(find.text('Ledger Updated (R4) (including for insurance)'), findsWidgets);
+      expect(find.text('Ledger Updated (R4) (including for insurance)'),
+          findsWidgets);
       expect(find.text('Individual Ledgers Prepared (EMR-wise)'), findsNothing);
       expect(find.text('EMR entries (2):'), findsWidgets);
       expect(find.text('1684, 1685'), findsWidgets);
@@ -751,7 +784,7 @@ void main() {
   });
 
   testWidgets(
-      'Enquiries Handled: per-call details are saved and restored without touching the activity quantity or minutes',
+      'Enquiries Handled: per-call details are saved and drive the read-only quantity and minutes',
       (tester) async {
     addTearDown(tester.view.reset);
     for (final width in const <double>[360, 390, 1280]) {
@@ -777,11 +810,11 @@ void main() {
       // Activities: 1 Registrations, 2 Enquiries Handled, 3 Ledger Updated, 4 Collection
       expect(find.text('Enquiry details — activity 2'), findsOneWidget);
 
-      // Activity 2's own quantity / minutes are typed by hand.
-      await tester.enterText(
-          find.widgetWithText(TextField, 'Quantity').at(1), '3');
-      await tester.enterText(
-          find.widgetWithText(TextField, 'Minutes').at(1), '25');
+      // Activity 2's quantity / minutes are read-only and start at 0.
+      expect(find.text('Auto-calculated from enquiry calls below'),
+          findsOneWidget);
+      expect(find.byKey(const ValueKey('enquiry-summary-Quantity')),
+          findsOneWidget);
 
       // Two enquiry rows are numbered 1 and 2 automatically; row 2 stays blank.
       await tester.ensureVisible(find.byKey(const ValueKey('add-enquiry')));
@@ -797,11 +830,24 @@ void main() {
 
       await tester.enterText(
           find.widgetWithText(TextField, 'Caller name').first, 'Mrs Sharma');
+      await tester.enterText(find.widgetWithText(TextField, 'Remarks').first,
+          'Asked about braces');
+      // Minutes fields: [0] registrations, [1] enquiry row 1
       await tester.enterText(
-          find.widgetWithText(TextField, 'Remarks').first, 'Asked about braces');
-      // Minutes fields: [0] registrations, [1] enquiries activity, [2] enquiry row 1
-      await tester.enterText(
-          find.widgetWithText(TextField, 'Minutes').at(2), '10');
+          find.widgetWithText(TextField, 'Minutes').at(1), '10');
+      await tester.pump();
+      expect(
+          tester
+              .widget<Text>(
+                  find.byKey(const ValueKey('enquiry-summary-Quantity')))
+              .data,
+          '1');
+      expect(
+          tester
+              .widget<Text>(
+                  find.byKey(const ValueKey('enquiry-summary-Minutes')))
+              .data,
+          '10');
       await tester.ensureVisible(find.byKey(const ValueKey('enq-status-0-')));
       await tester.tap(find.byKey(const ValueKey('enq-status-0-')));
       await tester.pumpAndSettle();
@@ -817,12 +863,11 @@ void main() {
       final saved = staffApi.allEntries
           .where((e) => e['uid'] == 'staff-farzana')
           .toList();
-      final activity =
-          saved.singleWhere((e) => e['taskId'] == 'enquiries');
-      expect(activity['quantity'], 3,
-          reason: 'quantity is NOT derived from the number of calls');
-      expect(activity['hours'], closeTo(25 / 60, 1e-9),
-          reason: 'minutes are NOT the sum of the call minutes');
+      final activity = saved.singleWhere((e) => e['taskId'] == 'enquiries');
+      expect(activity['quantity'], 1,
+          reason: 'quantity = number of worthwhile call rows');
+      expect(activity['hours'], closeTo(10 / 60, 1e-9),
+          reason: 'minutes = sum of the call minutes');
       final details =
           saved.where((e) => e['taskId'] == 'enquiry_detail').toList();
       expect(details, hasLength(1), reason: 'the blank row is not saved');
@@ -901,10 +946,10 @@ void main() {
 
     // Detailed report: details are listed beneath activity "Enquiries Handled".
     expect(find.text('Enquiry details (2)'), findsOneWidget);
-    expect(find.text('Mrs Sharma'), findsOneWidget);
+    expect(find.text('Mrs Sharma'), findsNWidgets(2));
     expect(find.text('Appointment booked'), findsOneWidget);
     expect(find.text('Remarks: Asked about braces'), findsOneWidget);
-    expect(find.text('Mr Khan'), findsOneWidget);
+    expect(find.text('Mr Khan'), findsNWidgets(2));
     expect(find.text('Follow-up required'), findsOneWidget);
     // Totals use only the activity-level minutes (30 + 25), not the call minutes.
     expect(find.text('Total Time: 55 min'), findsOneWidget);

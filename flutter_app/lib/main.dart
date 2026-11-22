@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -5,6 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'api.dart';
 import 'config.dart';
 import 'tasklog_style.dart';
+import 'payroll_reports.dart';
+import 'report_aggregation.dart';
 import 'performance_dashboard.dart';
 import 'staff_detailed_report.dart';
 import 'task_comparison_view.dart';
@@ -210,11 +213,32 @@ class _PortalState extends State<Portal> {
   ];
   final enqNo = <TextEditingController>[],
       enqName = <TextEditingController>[],
+      enqPhone = <TextEditingController>[],
       enqRemark = <TextEditingController>[],
       enqMins = <TextEditingController>[];
   final enqStatus = <String>[];
-  final otherTaskDesc = TextEditingController(),
-      otherTaskMins = TextEditingController();
+  // Actual first-start / last-end per row, parallel to enqMins / mins.
+  final enqStart = <DateTime?>[], enqEnd = <DateTime?>[];
+  final emrStart = <DateTime?>[], emrEnd = <DateTime?>[];
+
+  /// Five slots are allocated; only [otherTaskSlots] are shown/saved
+  /// (5 for ACCOUNTS, 1 for every other category).
+  static const int accountsOtherTaskSlots = 5;
+  final otherTaskDesc = List<TextEditingController>.generate(
+      accountsOtherTaskSlots, (_) => TextEditingController());
+  final otherTaskMins = List<TextEditingController>.generate(
+      accountsOtherTaskSlots, (_) => TextEditingController());
+  int get otherTaskSlots => category == 'ACCOUNTS' ? accountsOtherTaskSlots : 1;
+
+  void _clearOtherTasks() {
+    for (final c in otherTaskDesc) {
+      c.clear();
+    }
+    for (final c in otherTaskMins) {
+      c.clear();
+    }
+  }
+
   final newUserEmail = TextEditingController(),
       newUserName = TextEditingController(),
       newUserUid = TextEditingController();
@@ -265,32 +289,217 @@ class _PortalState extends State<Portal> {
     });
   }
 
+  // In-memory running timers. Keys: '<taskId>', 'enq-<row>', 'emr-<row>'.
+  final Map<String, DateTime> _running = {};
+
+  // One shared 1s ticker; elapsed labels listen to it (no page rebuilds).
+  final ValueNotifier<DateTime> _tick = ValueNotifier(DateTime.now());
+  Timer? _ticker;
+
+  void _ensureTicker() {
+    if (_ticker != null) return;
+    _ticker = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted || _running.isEmpty) {
+        t.cancel();
+        _ticker = null;
+        return;
+      }
+      _tick.value = DateTime.now();
+    });
+  }
+
+  Map<String, String> _timeFields(List<DateTime?> s, List<DateTime?> e, int i) {
+    final st = i < s.length ? s[i] : null;
+    final en = i < e.length ? e[i] : null;
+    return {
+      if (st != null) 'startTime': st.toUtc().toIso8601String(),
+      if (en != null) 'endTime': en.toUtc().toIso8601String(),
+    };
+  }
+
+  DateTime? _parseTs(dynamic v) {
+    if (v == null) return null;
+    return DateTime.tryParse(v.toString())?.toLocal();
+  }
+
+  void _shiftRunning(String prefix, int removed) {
+    final next = <String, DateTime>{};
+    _running.forEach((k, v) {
+      if (k.startsWith(prefix)) {
+        final i = int.tryParse(k.substring(prefix.length));
+        if (i == null) {
+          next[k] = v;
+        } else if (i < removed) {
+          next[k] = v;
+        } else if (i > removed) {
+          next['$prefix${i - 1}'] = v;
+        }
+      } else {
+        next[k] = v;
+      }
+    });
+    _running
+      ..clear()
+      ..addAll(next);
+  }
+
+  void _syncTimes(List<DateTime?> l, int n) {
+    while (l.length < n) {
+      l.add(null);
+    }
+  }
+
+  void _recordTime(String key, {required bool start}) {
+    final isEnq = key.startsWith('enq-');
+    final isEmr = key.startsWith('emr-');
+    if (!isEnq && !isEmr) return;
+    final i = int.tryParse(key.substring(4));
+    if (i == null) return;
+    final s = isEnq ? enqStart : emrStart;
+    final e = isEnq ? enqEnd : emrEnd;
+    _syncTimes(s, i + 1);
+    _syncTimes(e, i + 1);
+    final now = DateTime.now();
+    if (start) {
+      s[i] ??= now;
+    } else {
+      e[i] = now;
+    }
+  }
+
+  void _startTimer(String key) {
+    setState(() {
+      _running[key] = DateTime.now();
+      _recordTime(key, start: true);
+    });
+    _tick.value = DateTime.now();
+    _ensureTicker();
+  }
+
+  void _endTimer(String key, TextEditingController ctrl) {
+    final start = _running[key];
+    if (start == null) return;
+    final ms = DateTime.now().difference(start).inMilliseconds;
+    var add = (ms / 60000).ceil();
+    if (ms > 0 && add < 1) add = 1;
+    final existing = double.tryParse(ctrl.text.trim()) ?? 0;
+    final total = existing + add;
+    setState(() {
+      _running.remove(key);
+      _recordTime(key, start: false);
+      ctrl.text = total == total.roundToDouble()
+          ? total.toInt().toString()
+          : total.toStringAsFixed(2);
+    });
+    if (_running.isEmpty) {
+      _ticker?.cancel();
+      _ticker = null;
+    }
+  }
+
+  String _hhmm(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+  Widget _timerControls(String key, TextEditingController ctrl,
+      {required String startKey, required String endKey}) {
+    final start = _running[key];
+    final running = start != null;
+    const pad = EdgeInsets.symmetric(horizontal: 10, vertical: 6);
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Tooltip(
+          message: 'Start timer',
+          child: FilledButton.icon(
+            key: ValueKey(startKey),
+            style: FilledButton.styleFrom(
+                padding: pad,
+                minimumSize: const Size(0, 34),
+                backgroundColor: TaskLogStyle.teal),
+            onPressed: running ? null : () => _startTimer(key),
+            icon: const Icon(Icons.play_arrow, size: 18),
+            label: const Text('Start'),
+          ),
+        ),
+        Tooltip(
+          message: 'End timer and add elapsed minutes',
+          child: OutlinedButton.icon(
+            key: ValueKey(endKey),
+            style: OutlinedButton.styleFrom(
+                padding: pad, minimumSize: const Size(0, 34)),
+            onPressed: running ? () => _endTimer(key, ctrl) : null,
+            icon: const Icon(Icons.stop, size: 18),
+            label: const Text('End'),
+          ),
+        ),
+        if (running)
+          ValueListenableBuilder<DateTime>(
+            valueListenable: _tick,
+            builder: (_, now, __) => Text(
+                'Started ${_hhmm(start)} · Elapsed ${formatElapsed(now.difference(start))}',
+                style:
+                    const TextStyle(color: TaskLogStyle.muted, fontSize: 12)),
+          ),
+      ],
+    );
+  }
+
   void _addEnquiryRow(
-      {String? no, String name = '', String remark = '', String mins = '', String status = ''}) {
+      {String? no,
+      String name = '',
+      String phone = '',
+      String remark = '',
+      String mins = '',
+      String status = '',
+      DateTime? start,
+      DateTime? end}) {
     enqNo.add(TextEditingController(text: no ?? '${enqNo.length + 1}'));
     enqName.add(TextEditingController(text: name));
+    enqPhone.add(TextEditingController(text: phone));
     enqRemark.add(TextEditingController(text: remark));
     enqMins.add(TextEditingController(text: mins));
     enqStatus.add(status);
+    enqStart.add(start);
+    enqEnd.add(end);
   }
 
   void _removeEnquiryRow(int i) {
     enqNo.removeAt(i).dispose();
     enqName.removeAt(i).dispose();
+    enqPhone.removeAt(i).dispose();
     enqRemark.removeAt(i).dispose();
     enqMins.removeAt(i).dispose();
     enqStatus.removeAt(i);
+    if (i < enqStart.length) {
+      enqStart.removeAt(i);
+    }
+    if (i < enqEnd.length) {
+      enqEnd.removeAt(i);
+    }
+    _shiftRunning('enq-', i);
   }
 
   void _clearEnquiryRows() {
-    for (final c in [...enqNo, ...enqName, ...enqRemark, ...enqMins]) {
+    for (final c in [
+      ...enqNo,
+      ...enqName,
+      ...enqPhone,
+      ...enqRemark,
+      ...enqMins
+    ]) {
       c.dispose();
     }
     enqNo.clear();
     enqName.clear();
+    enqPhone.clear();
     enqRemark.clear();
     enqMins.clear();
     enqStatus.clear();
+    enqStart.clear();
+    enqEnd.clear();
+    _running.removeWhere((k, _) => k.startsWith('enq-'));
   }
 
   String? get emrTaskId {
@@ -311,6 +520,9 @@ class _PortalState extends State<Portal> {
 
   @override
   void dispose() {
+    _ticker?.cancel();
+    _ticker = null;
+    _tick.dispose();
     for (final c in qty.values) {
       c.dispose();
     }
@@ -327,8 +539,12 @@ class _PortalState extends State<Portal> {
       c.dispose();
     }
     _clearEnquiryRows();
-    otherTaskDesc.dispose();
-    otherTaskMins.dispose();
+    for (final c in otherTaskDesc) {
+      c.dispose();
+    }
+    for (final c in otherTaskMins) {
+      c.dispose();
+    }
     newUserEmail.dispose();
     newUserName.dispose();
     newUserUid.dispose();
@@ -461,11 +677,12 @@ class _PortalState extends State<Portal> {
         controller.dispose();
       }
       emr.clear();
+      emrStart.clear();
+      emrEnd.clear();
       remark.clear();
       mins.clear();
       _clearEnquiryRows();
-      otherTaskDesc.clear();
-      otherTaskMins.clear();
+      _clearOtherTasks();
       setState(() {
         branch = nextBranch;
         category = nextCategory;
@@ -539,11 +756,14 @@ class _PortalState extends State<Portal> {
       c.dispose();
     }
     emr.clear();
+    emrStart.clear();
+    emrEnd.clear();
     remark.clear();
     mins.clear();
+    _running.clear();
     _clearEnquiryRows();
-    otherTaskDesc.clear();
-    otherTaskMins.clear();
+    _clearOtherTasks();
+    final otherRows = <Map<String, dynamic>>[];
     final previous = List<dynamic>.from(result['entries'] ?? []);
     for (final raw in previous) {
       final row = Map<String, dynamic>.from(raw as Map);
@@ -553,19 +773,22 @@ class _PortalState extends State<Portal> {
         remark.add(TextEditingController(text: row['remarks'].toString()));
         final time = double.tryParse(row['hours'].toString()) ?? 0;
         mins.add(TextEditingController(text: (time * 60).round().toString()));
+        emrStart.add(_parseTs(row['startTime']));
+        emrEnd.add(_parseTs(row['endTime']));
       } else if (id == 'enquiry_detail') {
         final time = double.tryParse(row['hours'].toString()) ?? 0;
         _addEnquiryRow(
           no: (row['emr'] ?? '').toString(),
           name: (row['callerName'] ?? '').toString(),
+          phone: (row['callerPhone'] ?? '').toString(),
           remark: (row['remarks'] ?? '').toString(),
           mins: time > 0 ? (time * 60).round().toString() : '',
           status: (row['callStatus'] ?? '').toString(),
+          start: _parseTs(row['startTime']),
+          end: _parseTs(row['endTime']),
         );
       } else if (id == 'other_tasks') {
-        otherTaskDesc.text = row['remarks'].toString();
-        final time = double.tryParse(row['hours'].toString()) ?? 0;
-        otherTaskMins.text = (time * 60).round().toString();
+        otherRows.add(row);
       } else {
         qty.putIfAbsent(id, () => TextEditingController()).text =
             row['quantity'].toString();
@@ -574,7 +797,38 @@ class _PortalState extends State<Portal> {
             (time * 60).round().toString();
       }
     }
+    _restoreOtherTasks(otherRows, otherTaskSlots);
     setState(() => savedReportExists = previous.isNotEmpty);
+  }
+
+  /// Maps saved 'other_tasks' rows to slots by their emr value ('1'..'N';
+  /// legacy '' maps to slot 1). Rows with a missing/duplicate/out-of-range
+  /// slot fall to the next free slot; rows beyond capacity are dropped.
+  void _restoreOtherTasks(List<Map<String, dynamic>> rows, int slots) {
+    final taken = <int>{};
+    final pending = <Map<String, dynamic>>[];
+    void put(int i, Map<String, dynamic> row) {
+      taken.add(i);
+      otherTaskDesc[i].text = (row['remarks'] ?? '').toString();
+      final time = double.tryParse((row['hours'] ?? '').toString()) ?? 0;
+      otherTaskMins[i].text = time > 0 ? (time * 60).round().toString() : '';
+    }
+
+    for (final row in rows) {
+      final raw = (row['emr'] ?? '').toString().trim();
+      final n = raw.isEmpty ? 1 : int.tryParse(raw);
+      if (n != null && n >= 1 && n <= slots && !taken.contains(n - 1)) {
+        put(n - 1, row);
+      } else {
+        pending.add(row);
+      }
+    }
+    for (final row in pending) {
+      final free =
+          List.generate(slots, (i) => i).where((i) => !taken.contains(i));
+      if (free.isEmpty) break;
+      put(free.first, row);
+    }
   }
 
   Future<void> selectReportDate() async {
@@ -610,10 +864,54 @@ class _PortalState extends State<Portal> {
     }
   }
 
+  /// The summary card (activity "Ledger Updated") is derived from EMR rows.
+  bool _isLedgerSummary(String id) =>
+      id == ledgerSummaryTaskId && emrTaskId != null;
+
+  LedgerTotals _ledgerTotals() => computeLedgerTotals(
+      [for (final c in emr) c.text], [for (final c in mins) c.text]);
+
+  /// The "Enquiries Handled" card is derived from the enquiry call rows.
+  bool _isEnquirySummary(String id) =>
+      id == enquirySummaryTaskId && tasks.any((t) => t['id'] == id);
+
+  LedgerTotals _enquiryTotals() => computeEnquiryTotals([
+        for (int i = 0; i < enqNo.length; i++)
+          (
+            name: enqName[i].text,
+            phone: enqPhone[i].text,
+            remarks: enqRemark[i].text,
+            status: i < enqStatus.length ? enqStatus[i] : '',
+            minutes: enqMins[i].text,
+          )
+      ]);
+
   Future<void> saveTasks() async {
     final data = <Map<String, dynamic>>[];
     for (final task in tasks) {
       final id = task['id'].toString();
+      if (_isEnquirySummary(id)) {
+        final et = _enquiryTotals();
+        if (et.count > 0 || et.minutes > 0) {
+          data.add({
+            'taskId': id,
+            'quantity': et.count,
+            'hours': et.minutes / 60.0,
+          });
+        }
+        continue;
+      }
+      if (_isLedgerSummary(id)) {
+        final lt = _ledgerTotals();
+        if (lt.count > 0 || lt.minutes > 0) {
+          data.add({
+            'taskId': id,
+            'quantity': lt.count,
+            'hours': lt.minutes / 60.0,
+          });
+        }
+        continue;
+      }
       final qText = (qty[id]?.text ?? '').trim();
       final mText = (hours[id]?.text ?? '').trim();
       final parsedQ = qText.isEmpty ? 0.0 : (double.tryParse(qText) ?? 0.0);
@@ -640,7 +938,8 @@ class _PortalState extends State<Portal> {
             'emr': emr[i].text.trim(),
             'remarks': remark[i].text.trim(),
             'quantity': 1,
-            'hours': m > 0 ? m / 60 : 0
+            'hours': m > 0 ? m / 60 : 0,
+            ..._timeFields(emrStart, emrEnd, i),
           });
         }
       }
@@ -649,36 +948,47 @@ class _PortalState extends State<Portal> {
       for (int i = 0; i < enqNo.length; i++) {
         final no = enqNo[i].text.trim();
         final name = enqName[i].text.trim();
+        final phone = enqPhone[i].text.trim();
         final rem = enqRemark[i].text.trim();
         final status = enqStatus[i];
-        final parsedM = double.tryParse(enqMins[i].text.trim()) ?? 0.0;
-        final m = parsedM < 0 ? 0.0 : parsedM;
+        final m = _parseMinutes(enqMins[i].text);
         // The auto-filled number alone does not make a row worth saving.
-        if (name.isEmpty && rem.isEmpty && status.isEmpty && m == 0) continue;
+        if (!isEnquiryRowWorthSaving(
+            name: name,
+            phone: phone,
+            remarks: rem,
+            status: status,
+            minutes: enqMins[i].text)) {
+          continue;
+        }
         data.add({
           'taskId': 'enquiry_detail',
           'emr': no,
           'callerName': name,
+          'callerPhone': phone,
           'callStatus': status,
           'remarks': rem,
           'quantity': 1,
           'hours': m / 60.0,
+          ..._timeFields(enqStart, enqEnd, i),
         });
       }
     }
-    final otherDesc = otherTaskDesc.text.trim();
-    final otherMText = otherTaskMins.text.trim();
-    final parsedOtherM =
-        otherMText.isEmpty ? 0.0 : (double.tryParse(otherMText) ?? 0.0);
-    final otherM = parsedOtherM < 0 ? 0.0 : parsedOtherM;
-    if (otherDesc.isNotEmpty || otherM > 0) {
-      data.add({
-        'taskId': 'other_tasks',
-        'emr': '',
-        'remarks': otherDesc,
-        'quantity': 1,
-        'hours': otherM / 60.0,
-      });
+    for (var i = 0; i < otherTaskSlots; i++) {
+      final otherDesc = otherTaskDesc[i].text.trim();
+      final otherMText = otherTaskMins[i].text.trim();
+      final parsedOtherM =
+          otherMText.isEmpty ? 0.0 : (double.tryParse(otherMText) ?? 0.0);
+      final otherM = parsedOtherM < 0 ? 0.0 : parsedOtherM;
+      if (otherDesc.isNotEmpty || otherM > 0) {
+        data.add({
+          'taskId': 'other_tasks',
+          'emr': '${i + 1}',
+          'remarks': otherDesc,
+          'quantity': 1,
+          'hours': otherM / 60.0,
+        });
+      }
     }
     final formattedDate = [
       reportDate.day.toString().padLeft(2, '0'),
@@ -741,9 +1051,8 @@ class _PortalState extends State<Portal> {
               isExpanded: true,
               isDense: true,
               hint: const Text('Select'),
-              value: enquiryStatuses.contains(enqStatus[i])
-                  ? enqStatus[i]
-                  : null,
+              value:
+                  enquiryStatuses.contains(enqStatus[i]) ? enqStatus[i] : null,
               items: [
                 for (final v in enquiryStatuses)
                   DropdownMenuItem(value: v, child: Text(v)),
@@ -767,9 +1076,9 @@ class _PortalState extends State<Portal> {
                       fontWeight: FontWeight.w700, fontSize: 14.5)),
               const SizedBox(height: 4),
               const Text(
-                  'Optional list of each enquiry call. It does not change the '
-                  'Quantity or Minutes above, and its minutes are not counted in '
-                  'total hours worked.',
+                  'List each enquiry call here. The Quantity and Minutes above '
+                  'are calculated from these calls and counted once in total '
+                  'hours worked.',
                   style: TextStyle(color: TaskLogStyle.muted, fontSize: 12.5)),
               const SizedBox(height: 10),
               for (int i = 0; i < enqNo.length; i++)
@@ -784,12 +1093,20 @@ class _PortalState extends State<Portal> {
                   child: LayoutBuilder(builder: (context, c) {
                     final compact = c.maxWidth < 600;
                     final number = TextField(
-                        controller: enqNo[i],
-                        decoration: deco('No.'));
+                        controller: enqNo[i], decoration: deco('No.'));
                     final name = TextField(
                         controller: enqName[i],
                         textCapitalization: TextCapitalization.words,
                         decoration: deco('Caller name'));
+                    final phone = TextField(
+                        controller: enqPhone[i],
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'[0-9+\-() ]')),
+                          LengthLimitingTextInputFormatter(20),
+                        ],
+                        decoration: deco('Phone number'));
                     final mins = TextField(
                         controller: enqMins[i],
                         keyboardType: const TextInputType.numberWithOptions(
@@ -804,6 +1121,8 @@ class _PortalState extends State<Portal> {
                         tooltip: 'Remove this enquiry',
                         onPressed: () => setState(() => _removeEnquiryRow(i)),
                         icon: const Icon(Icons.delete_outline));
+                    final timer = _timerControls('enq-$i', enqMins[i],
+                        startKey: 'enq-start-$i', endKey: 'enq-end-$i');
                     if (compact) {
                       return Column(children: [
                         Row(children: [
@@ -813,11 +1132,15 @@ class _PortalState extends State<Portal> {
                           delete,
                         ]),
                         const SizedBox(height: 10),
+                        phone,
+                        const SizedBox(height: 10),
                         Row(children: [
                           Expanded(flex: 3, child: statusField(i)),
                           const SizedBox(width: 8),
                           Expanded(flex: 2, child: mins),
                         ]),
+                        const SizedBox(height: 8),
+                        Align(alignment: Alignment.centerLeft, child: timer),
                         const SizedBox(height: 10),
                         remarks,
                       ]);
@@ -828,11 +1151,15 @@ class _PortalState extends State<Portal> {
                         const SizedBox(width: 10),
                         Expanded(flex: 3, child: name),
                         const SizedBox(width: 10),
+                        Expanded(flex: 3, child: phone),
+                        const SizedBox(width: 10),
                         Expanded(flex: 2, child: statusField(i)),
                         const SizedBox(width: 10),
                         SizedBox(width: 110, child: mins),
                         delete,
                       ]),
+                      const SizedBox(height: 8),
+                      Align(alignment: Alignment.centerRight, child: timer),
                       const SizedBox(height: 10),
                       remarks,
                     ]);
@@ -923,96 +1250,175 @@ class _PortalState extends State<Portal> {
         final id = t['id'].toString();
         qty.putIfAbsent(id, () => TextEditingController());
         hours.putIfAbsent(id, () => TextEditingController());
+        final isLedgerSummary = _isLedgerSummary(id);
+        final isEnqSummary = _isEnquirySummary(id);
+        final isSummary = isLedgerSummary || isEnqSummary;
         final isYesNo = _yesNoTaskIds.contains(id);
         final yesNoValue =
             (double.tryParse(qty[id]?.text ?? '') ?? 0) >= 1 ? 'Yes' : 'No';
+        Widget readOnlyField(String label, String value) => InputDecorator(
+            decoration: InputDecoration(labelText: label),
+            child: Text(value,
+                key: ValueKey(isEnqSummary
+                    ? 'enquiry-summary-$label'
+                    : 'ledger-summary-$label')));
         final activityCard = ConstrainedBox(
           key: ValueKey('$branch|$category|$id'),
           constraints: const BoxConstraints(maxWidth: 940),
           child: Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: LayoutBuilder(builder: (context, constraints) {
-                final compact = constraints.maxWidth < 650;
-                final Widget quantityField = isYesNo
-                    ? InputDecorator(
-                        decoration:
-                            const InputDecoration(labelText: 'Yes / No'),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            key: ValueKey('yesno-$id-$yesNoValue'),
-                            isExpanded: true,
-                            isDense: true,
-                            value: yesNoValue,
-                            items: const [
-                              DropdownMenuItem(value: 'No', child: Text('No')),
-                              DropdownMenuItem(
-                                  value: 'Yes', child: Text('Yes')),
-                            ],
-                            onChanged: (v) {
-                              setState(() {
-                                qty[id]!.text = v == 'Yes' ? '1' : '0';
-                              });
-                            },
-                          ),
-                        ),
-                      )
-                    : TextField(
-                        controller: qty[id],
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        decoration: InputDecoration(
-                            labelText: id == 'collection' ? 'AED' : 'Quantity'),
-                      );
-                final hoursField = TextField(
-                  controller: hours[id],
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Minutes'),
-                );
-                final numberedTitle = Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$activityNumber. ',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: compact ? 15 : 14,
-                        color: TaskLogStyle.teal,
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        t['name'].toString(),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: compact ? 15 : 14,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-                if (compact) {
-                  return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        numberedTitle,
-                        const SizedBox(height: 14),
-                        Row(children: [
+              child: ListenableBuilder(
+                  listenable: isLedgerSummary
+                      ? Listenable.merge([...emr, ...mins])
+                      : isEnqSummary
+                          ? Listenable.merge([
+                              ...enqName,
+                              ...enqPhone,
+                              ...enqRemark,
+                              ...enqMins
+                            ])
+                          : const _NeverListenable(),
+                  builder: (context, _) =>
+                      LayoutBuilder(builder: (context, constraints) {
+                        final compact = constraints.maxWidth < 650;
+                        final lt = isLedgerSummary
+                            ? _ledgerTotals()
+                            : isEnqSummary
+                                ? _enquiryTotals()
+                                : null;
+                        final Widget quantityField = isSummary
+                            ? readOnlyField('Quantity', '${lt!.count}')
+                            : isYesNo
+                                ? InputDecorator(
+                                    decoration: const InputDecoration(
+                                        labelText: 'Yes / No'),
+                                    child: DropdownButtonHideUnderline(
+                                      child: DropdownButton<String>(
+                                        key: ValueKey('yesno-$id-$yesNoValue'),
+                                        isExpanded: true,
+                                        isDense: true,
+                                        value: yesNoValue,
+                                        items: const [
+                                          DropdownMenuItem(
+                                              value: 'No', child: Text('No')),
+                                          DropdownMenuItem(
+                                              value: 'Yes', child: Text('Yes')),
+                                        ],
+                                        onChanged: (v) {
+                                          setState(() {
+                                            qty[id]!.text =
+                                                v == 'Yes' ? '1' : '0';
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  )
+                                : TextField(
+                                    controller: qty[id],
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true),
+                                    decoration: InputDecoration(
+                                        labelText: id == 'collection'
+                                            ? 'AED'
+                                            : 'Quantity'),
+                                  );
+                        final Widget hoursField = isSummary
+                            ? readOnlyField(
+                                'Minutes', formatLedgerMinutes(lt!.minutes))
+                            : TextField(
+                                controller: hours[id],
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                decoration:
+                                    const InputDecoration(labelText: 'Minutes'),
+                              );
+                        final Widget? helper = isSummary
+                            ? Text(
+                                isEnqSummary
+                                    ? 'Auto-calculated from enquiry calls below'
+                                    : 'Auto-calculated from EMR-wise ledgers below',
+                                style: TextStyle(
+                                    color: TaskLogStyle.muted, fontSize: 12.5))
+                            : null;
+                        final numberedTitle = Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$activityNumber. ',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: compact ? 15 : 14,
+                                color: TaskLogStyle.teal,
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                t['name'].toString(),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: compact ? 15 : 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                        final showTimer =
+                            id != 'enquiries' && !isYesNo && !isSummary;
+                        final timer = showTimer
+                            ? _timerControls(id, hours[id]!,
+                                startKey: 'start-$id', endKey: 'end-$id')
+                            : null;
+                        if (compact) {
+                          return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                numberedTitle,
+                                const SizedBox(height: 14),
+                                Row(children: [
+                                  Expanded(child: quantityField),
+                                  const SizedBox(width: 10),
+                                  Expanded(child: hoursField),
+                                ]),
+                                if (helper != null) ...[
+                                  const SizedBox(height: 6),
+                                  helper
+                                ],
+                                if (timer != null) ...[
+                                  const SizedBox(height: 10),
+                                  timer,
+                                ],
+                              ]);
+                        }
+                        final row = Row(children: [
+                          Expanded(flex: 3, child: numberedTitle),
+                          const SizedBox(width: 16),
                           Expanded(child: quantityField),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 12),
                           Expanded(child: hoursField),
-                        ]),
-                      ]);
-                }
-                return Row(children: [
-                  Expanded(flex: 3, child: numberedTitle),
-                  const SizedBox(width: 16),
-                  Expanded(child: quantityField),
-                  const SizedBox(width: 12),
-                  Expanded(child: hoursField),
-                ]);
-              }),
+                        ]);
+                        if (helper != null) {
+                          return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                row,
+                                const SizedBox(height: 6),
+                                helper
+                              ]);
+                        }
+                        if (timer == null) return row;
+                        return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              row,
+                              const SizedBox(height: 10),
+                              Align(
+                                  alignment: Alignment.centerRight,
+                                  child: timer),
+                            ]);
+                      })),
             ),
           ),
         );
@@ -1077,9 +1483,22 @@ class _PortalState extends State<Portal> {
                                       emr.removeAt(i).dispose();
                                       remark.removeAt(i).dispose();
                                       mins.removeAt(i).dispose();
+                                      if (i < emrStart.length) {
+                                        emrStart.removeAt(i);
+                                      }
+                                      if (i < emrEnd.length) {
+                                        emrEnd.removeAt(i);
+                                      }
+                                      _shiftRunning('emr-', i);
                                     }),
                                 icon: const Icon(Icons.delete_outline)),
                           ]),
+                          const SizedBox(height: 8),
+                          Align(
+                              alignment: Alignment.centerLeft,
+                              child: _timerControls('emr-$i', mins[i],
+                                  startKey: 'emr-start-$i',
+                                  endKey: 'emr-end-$i')),
                           const SizedBox(height: 8),
                           TextField(
                               controller: remark[i],
@@ -1107,11 +1526,20 @@ class _PortalState extends State<Portal> {
                                 keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
                                     labelText: 'Minutes'))),
+                        _timerControls('emr-$i', mins[i],
+                            startKey: 'emr-start-$i', endKey: 'emr-end-$i'),
                         IconButton(
                             onPressed: () => setState(() {
                                   emr.removeAt(i).dispose();
                                   remark.removeAt(i).dispose();
                                   mins.removeAt(i).dispose();
+                                  if (i < emrStart.length) {
+                                    emrStart.removeAt(i);
+                                  }
+                                  if (i < emrEnd.length) {
+                                    emrEnd.removeAt(i);
+                                  }
+                                  _shiftRunning('emr-', i);
                                 }),
                             icon: const Icon(Icons.delete_outline))
                       ]);
@@ -1121,6 +1549,8 @@ class _PortalState extends State<Portal> {
                   emr.add(TextEditingController());
                   remark.add(TextEditingController());
                   mins.add(TextEditingController());
+                  emrStart.add(null);
+                  emrEnd.add(null);
                 }),
             icon: const Icon(Icons.add),
             label: const Text('Add EMR')),
@@ -1136,51 +1566,57 @@ class _PortalState extends State<Portal> {
         style: TextStyle(color: TaskLogStyle.muted, fontSize: 13),
       ),
       const SizedBox(height: 8),
-      ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 940),
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: LayoutBuilder(builder: (context, constraints) {
-              final compact = constraints.maxWidth < 650;
-              final descField = TextField(
-                controller: otherTaskDesc,
-                minLines: 1,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Other task carried out',
-                ),
-              );
-              final minsField = TextField(
-                controller: otherTaskMins,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Minutes',
-                ),
-              );
-              if (compact) {
-                return Column(
+      for (var i = 0; i < otherTaskSlots; i++) ...[
+        if (i > 0) const SizedBox(height: 4),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 940),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: LayoutBuilder(builder: (context, constraints) {
+                final compact = constraints.maxWidth < 650;
+                final multi = otherTaskSlots > 1;
+                final descField = TextField(
+                  controller: otherTaskDesc[i],
+                  minLines: 1,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: multi
+                        ? 'Other task ${i + 1}'
+                        : 'Other task carried out',
+                  ),
+                );
+                final minsField = TextField(
+                  controller: otherTaskMins[i],
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Minutes',
+                  ),
+                );
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      descField,
+                      const SizedBox(height: 12),
+                      minsField,
+                    ],
+                  );
+                }
+                return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    descField,
-                    const SizedBox(height: 12),
-                    minsField,
+                    Expanded(flex: 3, child: descField),
+                    const SizedBox(width: 16),
+                    Expanded(child: minsField),
                   ],
                 );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 3, child: descField),
-                  const SizedBox(width: 16),
-                  Expanded(child: minsField),
-                ],
-              );
-            }),
+              }),
+            ),
           ),
         ),
-      ),
+      ],
       const SizedBox(height: 20),
       FilledButton.icon(
           onPressed: saveTasks,
@@ -1190,8 +1626,8 @@ class _PortalState extends State<Portal> {
   }
 
   List<String> get _staffNameList => users
-      .where((u) =>
-          (u['role'] ?? '').toString().trim().toUpperCase() != 'ADMIN')
+      .where(
+          (u) => (u['role'] ?? '').toString().trim().toUpperCase() != 'ADMIN')
       .map((u) => (u['name'] ?? '').toString().trim())
       .where((s) => s.isNotEmpty && s.toLowerCase() != 'administrator')
       .toSet()
@@ -1204,7 +1640,9 @@ class _PortalState extends State<Portal> {
       if (empName.toLowerCase() == 'administrator') return false;
       if (!manager) {
         final rowUid = (e['uid'] ?? '').toString().trim();
-        if (currentUid.isNotEmpty && rowUid.isNotEmpty && rowUid != currentUid) {
+        if (currentUid.isNotEmpty &&
+            rowUid.isNotEmpty &&
+            rowUid != currentUid) {
           return false;
         }
       }
@@ -1231,7 +1669,34 @@ class _PortalState extends State<Portal> {
     );
   }
 
-  Widget detailedReports() => StaffDetailedReport(
+  ReportCriteria get _adminCriteria => ReportCriteria(
+        branch: adminBranch,
+        category: adminCategory,
+        employee: adminEmployee,
+        singleDate: adminSingleDate,
+        period: adminPeriod == null
+            ? null
+            : (start: adminPeriod!.start, end: adminPeriod!.end),
+        todayOnly: adminTodayOnly,
+      );
+
+  Widget detailedReports() =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Align(
+          alignment: Alignment.centerRight,
+          child: OutlinedButton.icon(
+            key: const ValueKey('export-pdf'),
+            onPressed: () => showPayrollReportsDialog(
+                context, _adminCriteria, staffDisplayName),
+            icon: const Icon(Icons.picture_as_pdf),
+            label: const Text('Export PDF'),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _detailedReportsBody(),
+      ]);
+
+  Widget _detailedReportsBody() => StaffDetailedReport(
         records: entries
             .where((e) =>
                 (e['employeeName'] ?? '').toString().trim().toLowerCase() !=
@@ -1410,6 +1875,7 @@ class _PortalState extends State<Portal> {
       if (p == 'Settings') return Icons.settings;
       return Icons.bar_chart;
     }
+
     if (narrow) {
       return Scaffold(
         appBar: AppBar(
@@ -1561,4 +2027,95 @@ class _PortalState extends State<Portal> {
       : (!branchSelected && !manager)
           ? Scaffold(body: branchSelector())
           : responsivePortal(context);
+}
+
+/// Formats a duration as H:MM:SS, or MM:SS under an hour.
+String formatElapsed(Duration d) {
+  final secs = d.isNegative ? 0 : d.inSeconds;
+  final h = secs ~/ 3600;
+  final m = (secs % 3600) ~/ 60;
+  final s = secs % 60;
+  String two(int n) => n.toString().padLeft(2, '0');
+  return h > 0 ? '$h:${two(m)}:${two(s)}' : '${two(m)}:${two(s)}';
+}
+
+/// Activity card whose totals come from the enquiry call rows.
+const String enquirySummaryTaskId = 'enquiries';
+
+double _parseMinutes(String s) {
+  final v = double.tryParse(s.trim()) ?? 0;
+  return v > 0 ? v : 0;
+}
+
+/// Same rule saveTasks uses to keep an enquiry_detail row: the auto-filled
+/// call number alone does not count.
+bool isEnquiryRowWorthSaving({
+  required String name,
+  required String phone,
+  required String remarks,
+  required String status,
+  required String minutes,
+}) =>
+    name.trim().isNotEmpty ||
+    phone.trim().isNotEmpty ||
+    remarks.trim().isNotEmpty ||
+    status.trim().isNotEmpty ||
+    _parseMinutes(minutes) > 0;
+
+typedef EnquiryRowInput = ({
+  String name,
+  String phone,
+  String remarks,
+  String status,
+  String minutes
+});
+
+/// Count of worthwhile enquiry rows and the sum of all rows' minutes.
+LedgerTotals computeEnquiryTotals(List<EnquiryRowInput> rows) {
+  var count = 0;
+  var total = 0.0;
+  for (final r in rows) {
+    if (isEnquiryRowWorthSaving(
+        name: r.name,
+        phone: r.phone,
+        remarks: r.remarks,
+        status: r.status,
+        minutes: r.minutes)) {
+      count++;
+    }
+    total += _parseMinutes(r.minutes);
+  }
+  return LedgerTotals(count, total);
+}
+
+/// Activity card whose totals come from the EMR-wise ledger rows.
+const String ledgerSummaryTaskId = 'ledger_updated';
+
+class LedgerTotals {
+  const LedgerTotals(this.count, this.minutes);
+  final int count;
+  final double minutes;
+}
+
+/// Count of rows with a non-empty EMR No. and the sum of all rows' minutes
+/// (negative/invalid values count as 0).
+LedgerTotals computeLedgerTotals(List<String> emrNos, List<String> minutes) {
+  final count = emrNos.where((e) => e.trim().isNotEmpty).length;
+  var total = 0.0;
+  for (final m in minutes) {
+    final v = double.tryParse(m.trim()) ?? 0;
+    if (v > 0) total += v;
+  }
+  return LedgerTotals(count, total);
+}
+
+String formatLedgerMinutes(double m) =>
+    m == m.roundToDouble() ? m.toInt().toString() : m.toStringAsFixed(1);
+
+class _NeverListenable extends Listenable {
+  const _NeverListenable();
+  @override
+  void addListener(VoidCallback listener) {}
+  @override
+  void removeListener(VoidCallback listener) {}
 }
