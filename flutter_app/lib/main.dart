@@ -248,7 +248,7 @@ class _PortalState extends State<Portal> {
   String adminEmployee = 'ALL';
   DateTime? adminSingleDate;
   DateTimeRange? adminPeriod;
-  bool adminTodayOnly = true;
+  bool adminTodayOnly = false;
 
   void _onAdminFilterChanged({
     String? branch,

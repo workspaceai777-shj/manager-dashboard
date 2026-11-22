@@ -52,7 +52,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
   String _localBranch = 'ALL', _localCategory = 'ALL', _localEmployee = 'ALL';
   DateTime? _localSingleDate;
   DateTimeRange? _localPeriod;
-  bool _localTodayOnly = true;
+  bool _localTodayOnly = false;
 
   String get branch => widget.branch ?? _localBranch;
   String get category => widget.category ?? _localCategory;

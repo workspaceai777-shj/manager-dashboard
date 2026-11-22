@@ -122,7 +122,7 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
   String _localBranch = 'ALL', _localCategory = 'ALL', _localEmployee = 'ALL';
   DateTime? _localSingleDate;
   DateTimeRange? _localPeriod;
-  bool _localTodayOnly = true;
+  bool _localTodayOnly = false;
 
   // Comparison view specific options
   bool _multiStaffOnly = false;

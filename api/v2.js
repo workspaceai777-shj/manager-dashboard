@@ -320,7 +320,9 @@ export default async function handler(req,res){
   const configuredOrigins = (process.env.ALLOWED_WEB_ORIGINS || '')
     .split(',').map(v => v.trim()).filter(Boolean);
   const localDevelopment = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin || '');
-  const trustedOrigin = !!origin && (localDevelopment || defaultOrigins.includes(origin) || configuredOrigins.includes(origin));
+  const isVercelOrigin = /^https:\/\/(tasklog|tasklog-[a-z0-9-]+)\.vercel\.app$/.test(origin || '') ||
+                        /^https:\/\/tasklog-[a-z0-9-]+-ambu7\.vercel\.app$/.test(origin || '');
+  const trustedOrigin = !!origin && (localDevelopment || defaultOrigins.includes(origin) || configuredOrigins.includes(origin) || isVercelOrigin);
   res.setHeader('Vary', 'Origin');
   if (trustedOrigin) {
     res.setHeader('Access-Control-Allow-Origin', origin);
