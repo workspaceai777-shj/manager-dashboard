@@ -388,6 +388,9 @@ export default async function handler(req,res){
       if(allowed.has('enquiries'))allowed.add('enquiry_detail');
       const rows=[];
       const seenLedger=new Set();
+      const isAccounts=body.category==='ACCOUNTS';
+      const maxOther=isAccounts?5:1;
+      const otherSlots=new Set();
       for(const e of body.entries){
         const task=String(e.taskId??'');
         const rawQty=(e.quantity===''||e.quantity===null||e.quantity===undefined)?0:Number(e.quantity);
@@ -419,6 +422,20 @@ export default async function handler(req,res){
         if(quantity===0&&hours===0&&task!=='ledger_prepared'&&task!=='insurance_ledger_emr'&&!(task==='other_tasks'&&remarks))continue;
         const normalizedQuantity=task==='collection'?quantity:Math.round(quantity);
         if(emr.length>70||remarks.length>1000)return result(res,400,{error:'EMR or remarks too long'});
+        if(task==='other_tasks'){
+          if(remarks.length>500)return result(res,400,{error:'Other task description too long (max 500)'});
+          if(otherSlots.size>=maxOther)return result(res,400,{error:'Too many other tasks'});
+          // ACCOUNTS: emr carries the slot '1'..'5' ('' = slot 1). Others: no slot.
+          let slot='';
+          if(isAccounts){
+            slot=emr===''?'1':emr;
+            if(!/^[1-5]$/.test(slot))return result(res,400,{error:'Invalid other task slot (1-5)'});
+          } else if(emr) return result(res,400,{error:'EMR is only accepted for EMR-wise preparation'});
+          if(otherSlots.has(slot))return result(res,400,{error:'Duplicate other task slot'});
+          otherSlots.add(slot);
+          rows.push([crypto.randomUUID(),new Date().toISOString(),uid,me.name,body.date,body.branch,body.category,task,slot,remarks,normalizedQuantity,hours,body.date]);
+          continue;
+        }
         if(task==='ledger_prepared'||task==='insurance_ledger_emr'){
           if(!emr)continue;
           const ledgerKey=`${task}:${emr}`;
