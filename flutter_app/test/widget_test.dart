@@ -132,7 +132,7 @@ class FakeStaffApi extends StaffApi {
         {'id': 'collection', 'name': 'Daily collection (AED)'},
         {
           'id': 'ledger_updated',
-          'name': 'Ledger Updated (R4) (including for insurance)'
+          'name': 'Individual Ledger Updated (R4) (including for insurance)'
         },
         {
           'id': 'ledger_prepared',
@@ -153,7 +153,7 @@ class FakeStaffApi extends StaffApi {
       },
       {
         'id': 'ledger_updated',
-        'name': 'Ledger Updated (R4) (including for insurance)'
+        'name': 'Individual Ledger Updated (R4) (including for insurance)'
       },
       {'id': 'collection', 'name': 'Daily Collection (AED)'},
     ];
@@ -481,7 +481,7 @@ void main() {
 
     // Enter Ledger Updated (R4) (including for insurance) = 5, Hours = 1.5 and save
     final ledgerCard = find.ancestor(
-      of: find.text('Ledger Updated (R4) (including for insurance)'),
+      of: find.text('Individual Ledger Updated (R4) (including for insurance)'),
       matching: find.byType(Card),
     );
     Future<void> addEmrRows(int from, int to) async {
@@ -583,7 +583,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Staff detailed activity reports'), findsOneWidget);
       expect(find.text('SECTION: FRONT DESK'), findsOneWidget);
-      expect(find.text('Ledger Updated (R4) (including for insurance)'),
+      expect(find.text('Individual Ledger Updated (R4) (including for insurance)'),
           findsWidgets);
 
       expect(find.text('Settings'), findsWidgets);
@@ -766,7 +766,7 @@ void main() {
       expect(find.text('Prince'), findsWidgets);
 
       // Verify ledger activities are merged as one, showing EMR entries and no duplicate activity
-      expect(find.text('Ledger Updated (R4) (including for insurance)'),
+      expect(find.text('Individual Ledger Updated (R4) (including for insurance)'),
           findsWidgets);
       expect(find.text('Individual Ledgers Prepared (EMR-wise)'), findsNothing);
       expect(find.text('EMR entries (2):'), findsWidgets);

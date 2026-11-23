@@ -269,7 +269,7 @@ const baseReception=[
 ];
 const brLedger=[
   ['ledger_prepared','Individual Ledgers Prepared (EMR-wise)'],
-  ['ledger_updated','Ledger Updated (R4) (including for insurance)'],
+  ['ledger_updated','Individual Ledger Updated (R4) (including for insurance)'],
   ['patient_cards','Arrival, Treatment Charts & Reporting Voucher preparation'],
   ['charts','Charts prepared for next day including session & rearranged all cards.'],
   ['patient_documents','Patient Doc Folder Updated'],
@@ -289,7 +289,7 @@ const bbTasks=[
   ['card_details','Card date/time, therapist and treatment entered'],
   ['patient_cards','Arrival, Treatment Charts & Reporting Voucher preparation'],
   ['charts','Charts prepared for next day including session & rearranged all cards.'],
-  ['ledger_updated','Ledger Updated (R4) (including for insurance)'],
+  ['ledger_updated','Individual Ledger Updated (R4) (including for insurance)'],
   ['room_chore_inspection','Room Chore Inspection'],
   ['daily_task_updation','Daily Task Updation'],
   ['ledger_prepared','Individual Ledgers Prepared (EMR-wise)']

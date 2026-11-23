@@ -161,7 +161,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
             'Charts prepared for next day including session & rearranged all cards.',
         'cards_arranged':
             'Charts prepared for next day including session & rearranged all cards.',
-        'ledger_updated': 'Ledger Updated (R4) (including for insurance)',
+        'ledger_updated': 'Individual Ledger Updated (R4) (including for insurance)',
         'room_chore_inspection': 'Room Chore Inspection',
         'daily_task_updation': 'Daily Task Updation',
         'ledger_prepared': 'Individual Ledgers Prepared (EMR-wise)',
@@ -180,7 +180,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       'enquiries': 'Enquiries Handled',
       'registration_excel': 'Patient Registration Excel updated',
       'ledger_prepared': 'Individual Ledgers Prepared (EMR-wise)',
-      'ledger_updated': 'Ledger Updated (R4) (including for insurance)',
+      'ledger_updated': 'Individual Ledger Updated (R4) (including for insurance)',
       'patient_cards':
           'Arrival, Treatment Charts & Reporting Voucher preparation',
       'charts':
