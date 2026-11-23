@@ -95,9 +95,31 @@ void main() {
         contains('shorter'));
   });
 
-  test('pdf builds for each type, including empty', () async {
+  test('pdf builds for each type, including empty and large multi-page datasets', () async {
+    final largeRows = <Map<String, dynamic>>[
+      for (var day = 0; day < 90; day++)
+        for (final staff in ['Asha', 'Ben', 'Chitra']) ...[
+          row(
+            staff.toLowerCase(),
+            staff,
+            isoDate(DateTime(2026, 1, 1).add(Duration(days: day))),
+            'registrations',
+            q: 5,
+            h: 1.5,
+          ),
+          row(
+            staff.toLowerCase(),
+            staff,
+            isoDate(DateTime(2026, 1, 1).add(Duration(days: day))),
+            'ledger_prepared',
+            q: 1,
+            h: 0.25,
+            extra: {'emr': 'E$day'},
+          ),
+        ],
+    ];
     for (final t in PdfReportType.values) {
-      for (final data in [rows, <Map<String, dynamic>>[]]) {
+      for (final data in [rows, <Map<String, dynamic>>[], largeRows]) {
         final bytes = await buildReportPdf(
             type: t,
             rows: data,

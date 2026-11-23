@@ -180,7 +180,7 @@ Future<Uint8List> buildReportPdf({
                 '${e['callStatus'] ?? ''}',
                 _t(e['startTime']),
                 _t(e['endTime']),
-                '${(double.tryParse('${e['hours']}') ?? 0) * 60 ~/ 1}',
+                '${((double.tryParse('${e['hours']}') ?? 0) * 60).round()}',
               ]
           ]));
         }
@@ -281,6 +281,7 @@ Future<Uint8List> buildReportPdf({
 
   doc.addPage(pw.MultiPage(
     pageFormat: format,
+    maxPages: 2000,
     margin: const pw.EdgeInsets.all(28),
     header: (c) => c.pageNumber == 1 ? header() : pw.SizedBox(),
     footer: footer,
@@ -356,8 +357,10 @@ class _PayrollReportsDialogState extends State<PayrollReportsDialog> {
   @override
   Widget build(BuildContext context) {
     final c = widget.criteria;
-    return AlertDialog(
-      title: const Text('Export PDF report'),
+    return MouseRegion(
+      cursor: busy ? SystemMouseCursors.wait : MouseCursor.defer,
+      child: AlertDialog(
+        title: const Text('Export PDF report'),
       content: SizedBox(
         width: 440,
         child: Column(
@@ -399,6 +402,7 @@ class _PayrollReportsDialogState extends State<PayrollReportsDialog> {
             icon: const Icon(Icons.print),
             label: const Text('Preview / print')),
       ],
+      ),
     );
   }
 }
