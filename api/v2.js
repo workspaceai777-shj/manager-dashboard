@@ -232,23 +232,22 @@ async function dbSaveEntries(sheets, markerRow, dataRows) {
         hours: Number(r[11]) || 0,
         task_date: r[12] || r[4],
       };
-      // Only enquiry detail rows carry these columns, so every other save keeps
-      // working even before the 002 migration has been applied.
-      if (r[7] === 'enquiry_detail') {
-        rec.caller_name = r[13] || '';
-        rec.call_status = r[14] || '';
-        rec.caller_phone = r[15] || '';
+      // All rows in a PostgREST bulk insert must have the exact same keys (PGRST102).
+      if (hasEnquiryCols) {
+        rec.caller_name = r[7] === 'enquiry_detail' ? (r[13] || '') : '';
+        rec.call_status = r[7] === 'enquiry_detail' ? (r[14] || '') : '';
+        rec.caller_phone = r[7] === 'enquiry_detail' ? (r[15] || '') : '';
       }
-      // Optional start/end (positional 16/17); only sent when present so saves
-      // still work before migration 004 is applied.
-      if (TIMED_TASKS.has(r[7])) {
-        if (r[16]) rec.start_time = r[16];
-        if (r[17]) rec.end_time = r[17];
+      if (hasTimedCols) {
+        rec.start_time = (TIMED_TASKS.has(r[7]) && r[16]) ? r[16] : null;
+        rec.end_time = (TIMED_TASKS.has(r[7]) && r[17]) ? r[17] : null;
       }
       return rec;
     };
-    if (markerRow) toInsert.push(toRecord(markerRow));
-    for (const r of dataRows) toInsert.push(toRecord(r));
+    const allInputRows = markerRow ? [markerRow, ...dataRows] : dataRows;
+    const hasEnquiryCols = allInputRows.some(r => r[7] === 'enquiry_detail');
+    const hasTimedCols = allInputRows.some(r => TIMED_TASKS.has(r[7]) && (r[16] || r[17]));
+    for (const r of allInputRows) toInsert.push(toRecord(r));
     if (toInsert.length) {
       await insertSupabaseRows('app_entries', toInsert);
     }

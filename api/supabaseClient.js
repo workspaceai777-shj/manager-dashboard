@@ -54,7 +54,7 @@ export async function readSupabaseTable(table, queryParams = '') {
   const match = contentRange.match(/\/(\d+)$/);
   const total = match ? parseInt(match[1], 10) : (firstPage.length < PAGE_SIZE ? firstPage.length : null);
 
-  if (total && total > PAGE_SIZE) {
+  if (firstPage.length === PAGE_SIZE && total && total > PAGE_SIZE) {
     const pagePromises = [];
     for (let from = PAGE_SIZE; from < total; from += PAGE_SIZE) {
       const to = Math.min(from + PAGE_SIZE - 1, total - 1);
@@ -95,8 +95,22 @@ export async function readSupabaseTable(table, queryParams = '') {
   return all;
 }
 
+const NOT_NULL_EMPTY_COLS = new Set(['caller_name', 'call_status', 'caller_phone', 'emr', 'remarks']);
+
 export async function insertSupabaseRows(table, rows, upsert = false) {
   if (!rows || rows.length === 0) return [];
+  // PostgREST requires all objects in a bulk insert array to have identical keys (PGRST102).
+  let payload = rows;
+  if (rows.length > 1) {
+    const allKeys = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
+    payload = rows.map((r) => {
+      const normalized = {};
+      for (const k of allKeys) {
+        normalized[k] = r[k] !== undefined ? r[k] : (NOT_NULL_EMPTY_COLS.has(k) ? '' : null);
+      }
+      return normalized;
+    });
+  }
   const url = `${getBaseUrl()}/rest/v1/${table}`;
   const headers = getHeaders();
   if (upsert) {
@@ -105,7 +119,7 @@ export async function insertSupabaseRows(table, rows, upsert = false) {
   const res = await fetch(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify(rows),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const errorText = await res.text();
