@@ -1712,7 +1712,8 @@ class _PortalState extends State<Portal> {
           child: OutlinedButton.icon(
             key: const ValueKey('export-pdf'),
             onPressed: () => showPayrollReportsDialog(
-                context, _adminCriteria, staffDisplayName),
+                context, _adminCriteria, staffDisplayName,
+                preloadedEntries: entries),
             icon: const Icon(Icons.picture_as_pdf),
             label: const Text('Export PDF'),
           ),

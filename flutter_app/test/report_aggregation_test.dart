@@ -124,6 +124,19 @@ void main() {
             h: 0.25,
             extra: {'emr': 'E$day'},
           ),
+          row(
+            staff.toLowerCase(),
+            staff,
+            isoDate(DateTime(2026, 1, 1).add(Duration(days: day))),
+            'other_tasks',
+            q: 1,
+            h: 0.5,
+            extra: {
+              'emr': '1',
+              'remarks':
+                  'Completed daily voucher verification, patient follow-up calls, and filing for day $day'
+            },
+          ),
         ],
     ];
     for (final t in PdfReportType.values) {

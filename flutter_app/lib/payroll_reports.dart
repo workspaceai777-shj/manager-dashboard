@@ -40,6 +40,9 @@ String pdfSafe(String v) => v
     .replaceAll(RegExp('[\u201C\u201D]'), '"')
     .replaceAll(RegExp(r'[^\x00-\xFF]'), '?');
 
+String _capCell(String s, [int maxLen = 350]) =>
+    s.length <= maxLen ? s : '${s.substring(0, maxLen)}...';
+
 String _two(int n) => n.toString().padLeft(2, '0');
 String _stamp(DateTime d) =>
     '${_two(d.day)}/${_two(d.month)}/${d.year} ${_two(d.hour)}:${_two(d.minute)}';
@@ -82,7 +85,7 @@ Future<Uint8List> buildReportPdf({
     return pw.TableHelper.fromTextArray(
       headers: head,
       data: [
-        for (final r in data) [for (final c in r) pdfSafe(c)]
+        for (final r in data) [for (final c in r) pdfSafe(_capCell(c))]
       ],
       headerStyle: pw.TextStyle(
           fontSize: 8.5,
@@ -346,16 +349,12 @@ Future<Uint8List> buildReportPdf({
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
     String formatCell(ActivityTotal a, UserActivityDetail? c) {
-      if (c == null ||
-          (c.quantity == 0 && c.minutes == 0 && c.descriptions.isEmpty)) {
+      if (c == null || (c.quantity == 0 && c.minutes == 0)) {
         return '-';
       }
       final qPart =
           a.isCollection ? 'AED ${_q(c.quantity)}' : 'Qty: ${_q(c.quantity)}';
       final mPart = '${c.minutes} min';
-      if (c.descriptions.isNotEmpty) {
-        return '$qPart ($mPart)\n${c.descriptions.join('; ')}';
-      }
       return '$qPart ($mPart)';
     }
 
@@ -430,10 +429,12 @@ class PayrollReportsDialog extends StatefulWidget {
     required this.criteria,
     required this.generatedBy,
     this.api,
+    this.preloadedEntries,
   });
   final ReportCriteria criteria;
   final String generatedBy;
   final StaffApi? api;
+  final List<dynamic>? preloadedEntries;
 
   @override
   State<PayrollReportsDialog> createState() => _PayrollReportsDialogState();
@@ -459,13 +460,31 @@ class _PayrollReportsDialogState extends State<PayrollReportsDialog> {
     });
     try {
       final c = widget.criteria;
-      final res = await api.request('report', body: {
-        'from': isoDate(r.from),
-        'to': isoDate(r.to),
-        if (c.branch != 'ALL') 'branch': c.branch,
-        if (c.category != 'ALL') 'category': c.category,
-      }).timeout(const Duration(seconds: 60));
-      final rows = filterEntries(List.from(res['entries'] ?? []), c);
+      final fromIso = isoDate(r.from);
+      final toIso = isoDate(r.to);
+      final cutoffIso = isoDate(
+          DateTime(now.year, now.month, now.day).subtract(const Duration(days: 355)));
+      List<dynamic> rawEntries;
+      if (widget.preloadedEntries != null &&
+          widget.preloadedEntries!.isNotEmpty &&
+          fromIso.compareTo(cutoffIso) >= 0) {
+        rawEntries = widget.preloadedEntries!.where((e) {
+          if (e is! Map) return false;
+          final d = TaskLogStyle.parseEntryDate(e['Task Date'] ?? e['date']);
+          if (d == null) return false;
+          final dIso = isoDate(d);
+          return dIso.compareTo(fromIso) >= 0 && dIso.compareTo(toIso) <= 0;
+        }).toList();
+      } else {
+        final res = await api.request('report', body: {
+          'from': fromIso,
+          'to': toIso,
+          if (c.branch != 'ALL') 'branch': c.branch,
+          if (c.category != 'ALL') 'category': c.category,
+        }).timeout(const Duration(seconds: 60));
+        rawEntries = List.from(res['entries'] ?? []);
+      }
+      final rows = filterEntries(rawEntries, c);
       final bytes = await buildReportPdf(
           type: type,
           rows: rows,
@@ -546,7 +565,12 @@ class _PayrollReportsDialogState extends State<PayrollReportsDialog> {
 }
 
 Future<void> showPayrollReportsDialog(
-        BuildContext context, ReportCriteria c, String by) =>
+        BuildContext context, ReportCriteria c, String by,
+        {List<dynamic>? preloadedEntries}) =>
     showDialog(
         context: context,
-        builder: (_) => PayrollReportsDialog(criteria: c, generatedBy: by));
+        builder: (_) => PayrollReportsDialog(
+              criteria: c,
+              generatedBy: by,
+              preloadedEntries: preloadedEntries,
+            ));
