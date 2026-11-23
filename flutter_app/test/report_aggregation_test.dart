@@ -32,13 +32,17 @@ void main() {
     expect(countedMinutes(rows[3]), 0);
   });
 
-  test('staff summary totals, days and average', () {
+  test('staff summary totals, days, standard hours, variance, and average', () {
     final s = buildStaffSummary(rows);
     expect(s.map((e) => e.name), ['Asha', 'Ben']);
     final a = s.first;
     expect(a.daysWorked, 2);
     expect(a.days.first.minutes, 90);
+    expect(a.days.first.standardMinutes, 600);
+    expect(a.days.first.varianceMinutes, 600 - 90);
     expect(a.totalMinutes, 90 + 120);
+    expect(a.standardMinutes, 2 * 600);
+    expect(a.varianceMinutes, 1200 - 210);
     expect(a.avgMinutesPerDay, 105);
   });
 

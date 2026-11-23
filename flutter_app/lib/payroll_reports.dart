@@ -241,42 +241,88 @@ Future<Uint8List> buildReportPdf({
   final body = <pw.Widget>[];
   if (type == PdfReportType.staffSummary) {
     final list = buildStaffSummary(rows);
+    final totalDays = list.fold<int>(0, (sum, s) => sum + s.daysWorked);
+    final totalStdMins = list.fold<int>(0, (sum, s) => sum + s.standardMinutes);
+    final totalActMins = list.fold<int>(0, (sum, s) => sum + s.totalMinutes);
+    final totalVarMins = list.fold<int>(0, (sum, s) => sum + s.varianceMinutes);
+    final overallAvgMins = totalDays == 0 ? 0.0 : totalActMins / totalDays;
+
     body.add(pw.SizedBox(height: 6));
     body.add(table([
       'Staff',
       'Days worked',
-      'Total minutes',
-      'Total hours',
-      'Avg hours / day'
+      'Standard min',
+      'Standard hrs',
+      'Actual min',
+      'Actual hrs',
+      'Variance (min)',
+      'Variance (hrs)',
+      'Avg hrs / day'
     ], [
       for (final s in list)
         [
           s.name,
           '${s.daysWorked}',
+          '${s.standardMinutes}',
+          fmtHours(s.standardMinutes),
           '${s.totalMinutes}',
           fmtHours(s.totalMinutes),
+          '${s.varianceMinutes}',
+          fmtHours(s.varianceMinutes),
           fmtHours(s.avgMinutesPerDay),
-        ]
+        ],
+      if (list.isNotEmpty)
+        [
+          'Total',
+          '$totalDays',
+          '$totalStdMins',
+          fmtHours(totalStdMins),
+          '$totalActMins',
+          fmtHours(totalActMins),
+          '$totalVarMins',
+          fmtHours(totalVarMins),
+          fmtHours(overallAvgMins),
+        ],
     ], align: {
-      for (var i = 1; i < 5; i++) i: pw.Alignment.centerRight
+      for (var i = 1; i < 9; i++) i: pw.Alignment.centerRight
     }));
     body.add(pw.SizedBox(height: 4));
     body.add(pw.Text(
-        'Daily total = sum of activity minutes. Enquiry call and EMR-wise ledger minutes are breakdowns and are not added. Days worked = dates with at least one entry.',
+        'Standard working hours = 10.00 hrs (600 min) per day. Variance = Standard working hours - Actual hours worked. Daily total = sum of activity minutes (enquiry call and EMR-wise ledger minutes are breakdowns and are not added).',
         style: pw.TextStyle(fontSize: 8, fontStyle: pw.FontStyle.italic)));
     for (final s in list) {
       body.add(pw.SizedBox(height: 10));
       body.add(pw.Text(pdfSafe('${s.name} - per day'), style: bold));
       body.add(table([
         'Date',
-        'Minutes',
-        'Hours'
+        'Standard min',
+        'Standard hrs',
+        'Actual min',
+        'Actual hrs',
+        'Variance (min)',
+        'Variance (hrs)'
       ], [
         for (final d in s.days)
-          [TaskLogStyle.dateLabel(d.date), '${d.minutes}', fmtHours(d.minutes)]
+          [
+            TaskLogStyle.dateLabel(d.date),
+            '${d.standardMinutes}',
+            fmtHours(d.standardMinutes),
+            '${d.minutes}',
+            fmtHours(d.minutes),
+            '${d.varianceMinutes}',
+            fmtHours(d.varianceMinutes),
+          ],
+        [
+          'Total (${s.daysWorked} ${s.daysWorked == 1 ? 'day' : 'days'})',
+          '${s.standardMinutes}',
+          fmtHours(s.standardMinutes),
+          '${s.totalMinutes}',
+          fmtHours(s.totalMinutes),
+          '${s.varianceMinutes}',
+          fmtHours(s.varianceMinutes),
+        ],
       ], align: {
-        1: pw.Alignment.centerRight,
-        2: pw.Alignment.centerRight
+        for (var i = 1; i < 7; i++) i: pw.Alignment.centerRight
       }));
     }
   } else {

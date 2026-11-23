@@ -179,10 +179,15 @@ List<StaffDetail> buildDetailed(List<Map<String, dynamic>> rows) {
 
 // ----------------------------------------------------------- staff summary
 
+const int standardDailyHours = 10;
+const int standardDailyMinutes = standardDailyHours * 60;
+
 class DayTotal {
   DayTotal(this.date, this.minutes);
   final DateTime date;
   final int minutes;
+  int get standardMinutes => standardDailyMinutes;
+  int get varianceMinutes => standardMinutes - minutes;
 }
 
 class StaffSummary {
@@ -192,7 +197,9 @@ class StaffSummary {
 
   /// Distinct dates on which the staff member recorded at least one entry.
   int get daysWorked => days.length;
+  int get standardMinutes => daysWorked * standardDailyMinutes;
   int get totalMinutes => days.fold(0, (a, d) => a + d.minutes);
+  int get varianceMinutes => standardMinutes - totalMinutes;
   double get avgMinutesPerDay =>
       daysWorked == 0 ? 0 : totalMinutes / daysWorked;
 }
