@@ -249,7 +249,7 @@ async function dbSaveEntries(sheets, markerRow, dataRows) {
     const hasTimedCols = allInputRows.some(r => TIMED_TASKS.has(r[7]) && (r[16] || r[17]));
     for (const r of allInputRows) toInsert.push(toRecord(r));
     if (toInsert.length) {
-      await insertSupabaseRows('app_entries', toInsert);
+      await insertSupabaseRows('app_entries', toInsert, false, true);
     }
     return;
   }
@@ -510,7 +510,26 @@ export default async function handler(req,res){
       } else {
         await dbSaveEntries(sheets, null, rows);
       }
-      return result(res,200,{saved:rows.length});
+      const savedEntries = rows.map(r => ({
+        id: r[0],
+        createdAt: r[1],
+        uid: r[2],
+        employeeName: r[3],
+        date: r[4],
+        branch: r[5],
+        category: r[6],
+        taskId: r[7],
+        emr: r[8] || '',
+        remarks: r[9] || '',
+        quantity: String(r[10] ?? 0),
+        hours: String(r[11] ?? 0),
+        callerName: r[13] || '',
+        callStatus: r[14] || '',
+        callerPhone: r[15] || '',
+        ...(TIMED_TASKS.has(r[7]) ? { startTime: isoOrNull(r[16]), endTime: isoOrNull(r[17]) } : {}),
+        'Task Date': r[12] || r[4],
+      }));
+      return result(res,200,{saved:rows.length,entries:savedEntries});
     }
     if(body.action==='dashboard'||body.action==='myDashboard'){
       if(body.action==='dashboard'&&me.role!=='ADMIN')

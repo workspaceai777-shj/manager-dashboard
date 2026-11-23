@@ -97,7 +97,7 @@ export async function readSupabaseTable(table, queryParams = '') {
 
 const NOT_NULL_EMPTY_COLS = new Set(['caller_name', 'call_status', 'caller_phone', 'emr', 'remarks']);
 
-export async function insertSupabaseRows(table, rows, upsert = false) {
+export async function insertSupabaseRows(table, rows, upsert = false, returnMinimal = false) {
   if (!rows || rows.length === 0) return [];
   // PostgREST requires all objects in a bulk insert array to have identical keys (PGRST102).
   let payload = rows;
@@ -114,7 +114,11 @@ export async function insertSupabaseRows(table, rows, upsert = false) {
   const url = `${getBaseUrl()}/rest/v1/${table}`;
   const headers = getHeaders();
   if (upsert) {
-    headers['Prefer'] = 'resolution=merge-duplicates,return=representation';
+    headers['Prefer'] = returnMinimal
+      ? 'resolution=merge-duplicates,return=minimal'
+      : 'resolution=merge-duplicates,return=representation';
+  } else if (returnMinimal) {
+    headers['Prefer'] = 'return=minimal';
   }
   const res = await fetch(url, {
     method: 'POST',
@@ -125,6 +129,7 @@ export async function insertSupabaseRows(table, rows, upsert = false) {
     const errorText = await res.text();
     throw new Error(`Supabase POST ${table} failed (${res.status}): ${errorText}`);
   }
+  if (returnMinimal || res.status === 204) return [];
   return await res.json();
 }
 

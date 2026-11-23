@@ -249,6 +249,7 @@ class _PortalState extends State<Portal> {
   DateTime? adminSingleDate;
   DateTimeRange? adminPeriod;
   bool adminTodayOnly = false;
+  bool saving = false;
 
   void _onAdminFilterChanged({
     String? branch,
@@ -737,12 +738,19 @@ class _PortalState extends State<Portal> {
   }
 
   Future<void> restoreReport(String selectedBranch, String selectedCategory,
-      DateTime selectedDate) async {
-    final result = await api.request('report', body: {
-      'branch': selectedBranch,
-      'category': selectedCategory,
-      'date': _date(selectedDate),
-    });
+      DateTime selectedDate,
+      {List<dynamic>? preloadedEntries}) async {
+    final List<dynamic> previous;
+    if (preloadedEntries != null) {
+      previous = preloadedEntries;
+    } else {
+      final result = await api.request('report', body: {
+        'branch': selectedBranch,
+        'category': selectedCategory,
+        'date': _date(selectedDate),
+      });
+      previous = List<dynamic>.from(result['entries'] ?? []);
+    }
     if (!mounted) return;
     for (final c in qty.values) {
       c.clear();
@@ -768,7 +776,6 @@ class _PortalState extends State<Portal> {
     _clearEnquiryRows();
     _clearOtherTasks();
     final otherRows = <Map<String, dynamic>>[];
-    final previous = List<dynamic>.from(result['entries'] ?? []);
     for (final raw in previous) {
       final row = Map<String, dynamic>.from(raw as Map);
       final id = row['taskId'].toString();
@@ -891,6 +898,7 @@ class _PortalState extends State<Portal> {
       ]);
 
   Future<void> saveTasks() async {
+    if (saving) return;
     final data = <Map<String, dynamic>>[];
     for (final task in tasks) {
       final id = task['id'].toString();
@@ -1026,19 +1034,26 @@ class _PortalState extends State<Portal> {
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted || saving) return;
+    setState(() => saving = true);
     try {
-      await api.request('saveReport', body: {
+      final saveRes = await api.request('saveReport', body: {
         'branch': branch,
         'category': category,
         'date': _date(reportDate),
         'entries': data
       });
-      await restoreReport(branch, category, reportDate);
-      await refreshDashboardData();
+      final returnedEntries = (saveRes is Map && saveRes['entries'] is List)
+          ? List<dynamic>.from(saveRes['entries'] as List)
+          : null;
+      await restoreReport(branch, category, reportDate,
+          preloadedEntries: returnedEntries);
+      unawaited(refreshDashboardData());
       message('Daily report saved for ${_date(reportDate)}');
     } catch (e) {
       message(e.toString());
+    } finally {
+      if (mounted) setState(() => saving = false);
     }
   }
 
@@ -1623,9 +1638,15 @@ class _PortalState extends State<Portal> {
       ],
       const SizedBox(height: 20),
       FilledButton.icon(
-          onPressed: saveTasks,
-          icon: const Icon(Icons.save),
-          label: const Text('Save daily report')),
+          onPressed: saving ? null : saveTasks,
+          icon: saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2.2),
+                )
+              : const Icon(Icons.save),
+          label: Text(saving ? 'Saving daily report...' : 'Save daily report')),
     ]);
   }
 
@@ -2026,11 +2047,17 @@ class _PortalState extends State<Portal> {
   }
 
   @override
-  Widget build(BuildContext context) => loading
-      ? const Scaffold(body: Center(child: CircularProgressIndicator()))
-      : (!branchSelected && !manager)
-          ? Scaffold(body: branchSelector())
-          : responsivePortal(context);
+  Widget build(BuildContext context) => MouseRegion(
+        cursor: saving ? SystemMouseCursors.wait : MouseCursor.defer,
+        child: AbsorbPointer(
+          absorbing: saving,
+          child: loading
+              ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+              : (!branchSelected && !manager)
+                  ? Scaffold(body: branchSelector())
+                  : responsivePortal(context),
+        ),
+      );
 }
 
 /// Formats a duration as H:MM:SS, or MM:SS under an hour.
