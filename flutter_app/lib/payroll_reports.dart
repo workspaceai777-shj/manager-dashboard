@@ -120,23 +120,38 @@ Future<Uint8List> buildReportPdf({
         ),
       );
 
-  final body = <pw.Widget>[];
   if (rows.isEmpty) {
-    body.add(pw.Padding(
-        padding: const pw.EdgeInsets.only(top: 30),
-        child: pw.Text('No records found for the selected filters and period.',
-            style: pw.TextStyle(fontSize: 12))));
-  } else if (type == PdfReportType.detailed) {
+    doc.addPage(pw.MultiPage(
+      pageFormat: format,
+      maxPages: 2000,
+      margin: const pw.EdgeInsets.all(28),
+      header: (_) => header(),
+      footer: footer,
+      build: (_) => [
+        pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 30),
+            child: pw.Text(
+                'No records found for the selected filters and period.',
+                style: pw.TextStyle(fontSize: 12))),
+        signatures(),
+      ],
+    ));
+    return doc.save();
+  }
+
+  if (type == PdfReportType.detailed) {
     for (final s in buildDetailed(rows)) {
-      body.add(pw.SizedBox(height: 8));
-      body.add(pw.Text(pdfSafe('Staff: ${s.name}'),
-          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)));
+      final userBody = <pw.Widget>[
+        pw.SizedBox(height: 6),
+        pw.Text(pdfSafe('Staff: ${s.name}'),
+            style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+      ];
       for (final d in s.days) {
-        body.add(pw.SizedBox(height: 4));
-        body.add(pw.Text(
+        userBody.add(pw.SizedBox(height: 4));
+        userBody.add(pw.Text(
             'Date: ${TaskLogStyle.dateLabel(d.date)}   Total working time: ${fmtMinutes(d.totalMinutes)}',
             style: bold));
-        body.add(table([
+        userBody.add(table([
           'Activity',
           'Quantity',
           'Minutes'
@@ -162,9 +177,9 @@ Future<Uint8List> buildReportPdf({
           2: const pw.FlexColumnWidth(1),
         }));
         if (d.enquiries.isNotEmpty) {
-          body.add(pw.SizedBox(height: 3));
-          body.add(pw.Text('Enquiry calls (activity 7)', style: bold));
-          body.add(table([
+          userBody.add(pw.SizedBox(height: 3));
+          userBody.add(pw.Text('Enquiry calls (activity 7)', style: bold));
+          userBody.add(table([
             'Call no.',
             'Caller',
             'Status',
@@ -184,9 +199,9 @@ Future<Uint8List> buildReportPdf({
           ]));
         }
         if (d.ledger.isNotEmpty) {
-          body.add(pw.SizedBox(height: 3));
-          body.add(pw.Text('Individual ledger - EMR-wise', style: bold));
-          body.add(table([
+          userBody.add(pw.SizedBox(height: 3));
+          userBody.add(pw.Text('Individual ledger - EMR-wise', style: bold));
+          userBody.add(table([
             'EMR no.',
             'Remarks',
             'Start',
@@ -206,8 +221,21 @@ Future<Uint8List> buildReportPdf({
           }));
         }
       }
+      userBody.add(signatures());
+      doc.addPage(pw.MultiPage(
+        pageFormat: format,
+        maxPages: 2000,
+        margin: const pw.EdgeInsets.all(28),
+        header: (_) => header(),
+        footer: footer,
+        build: (_) => userBody,
+      ));
     }
-  } else if (type == PdfReportType.staffSummary) {
+    return doc.save();
+  }
+
+  final body = <pw.Widget>[];
+  if (type == PdfReportType.staffSummary) {
     final list = buildStaffSummary(rows);
     body.add(pw.SizedBox(height: 6));
     body.add(table([
@@ -334,7 +362,7 @@ Future<Uint8List> buildReportPdf({
     pageFormat: format,
     maxPages: 2000,
     margin: const pw.EdgeInsets.all(28),
-    header: (c) => c.pageNumber == 1 ? header() : pw.SizedBox(),
+    header: (_) => header(),
     footer: footer,
     build: (_) => body,
   ));
