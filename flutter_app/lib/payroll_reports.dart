@@ -76,10 +76,6 @@ Future<Uint8List> buildReportPdf({
         pw.Text('Generated: ${_stamp(at)} by $generatedBy', style: base),
         pw.Divider(),
       ]);
-  pw.Widget footer(pw.Context c) => pw.Align(
-      alignment: pw.Alignment.centerRight,
-      child: pw.Text('Page ${c.pageNumber} of ${c.pagesCount}',
-          style: pw.TextStyle(fontSize: 8)));
 
   pw.Widget table(List<String> head, List<List<String>> data,
       {Map<int, pw.Alignment>? align, Map<int, pw.TableColumnWidth>? widths}) {
@@ -102,22 +98,32 @@ Future<Uint8List> buildReportPdf({
     );
   }
 
-  pw.Widget signatures() => pw.Padding(
-        padding: const pw.EdgeInsets.only(top: 36),
-        child: pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            for (final l in ['Prepared by', 'Verified by', 'Approved by'])
-              pw.SizedBox(
-                width: 170,
-                child: pw.Column(children: [
-                  pw.Divider(thickness: 0.6),
-                  pw.Text(l, style: bold),
-                  pw.Text('Name / Date', style: pw.TextStyle(fontSize: 7.5)),
-                ]),
-              ),
-          ],
-        ),
+  pw.Widget reportFooter(pw.Context c) => pw.Column(
+        mainAxisSize: pw.MainAxisSize.min,
+        children: [
+          pw.SizedBox(height: 10),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              for (final l in ['Prepared by', 'Verified by', 'Approved by'])
+                pw.SizedBox(
+                  width: 170,
+                  child: pw.Column(children: [
+                    pw.Divider(thickness: 0.6),
+                    pw.Text(l, style: bold),
+                    pw.Text('Name / Date',
+                        style: const pw.TextStyle(fontSize: 7.5)),
+                  ]),
+                ),
+            ],
+          ),
+          pw.SizedBox(height: 4),
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text('Page ${c.pageNumber} of ${c.pagesCount}',
+                style: const pw.TextStyle(fontSize: 8)),
+          ),
+        ],
       );
 
   if (rows.isEmpty) {
@@ -126,14 +132,13 @@ Future<Uint8List> buildReportPdf({
       maxPages: 2000,
       margin: const pw.EdgeInsets.all(28),
       header: (_) => header(),
-      footer: footer,
+      footer: reportFooter,
       build: (_) => [
         pw.Padding(
             padding: const pw.EdgeInsets.only(top: 30),
             child: pw.Text(
                 'No records found for the selected filters and period.',
-                style: pw.TextStyle(fontSize: 12))),
-        signatures(),
+                style: const pw.TextStyle(fontSize: 12))),
       ],
     ));
     return doc.save();
@@ -221,13 +226,12 @@ Future<Uint8List> buildReportPdf({
           }));
         }
       }
-      userBody.add(signatures());
       doc.addPage(pw.MultiPage(
         pageFormat: format,
         maxPages: 2000,
         margin: const pw.EdgeInsets.all(28),
         header: (_) => header(),
-        footer: footer,
+        footer: reportFooter,
         build: (_) => userBody,
       ));
     }
@@ -275,13 +279,17 @@ Future<Uint8List> buildReportPdf({
         2: pw.Alignment.centerRight
       }));
     }
-    body.add(signatures());
   } else {
     final list = buildActivitySummary(rows);
-    final staffSet = <String>{};
+    final staffSet = <String>{
+      for (final a in list) ...a.byUser.keys,
+    };
     final staffWorkingMins = <String, int>{};
     for (final r in rows) {
-      final name = (r['employeeName'] ?? '').toString().trim();
+      final rawName = (r['employeeName'] ?? '').toString().trim();
+      final name = rawName.isNotEmpty
+          ? rawName
+          : (r['uid'] ?? '').toString().trim().toLowerCase();
       if (name.isNotEmpty) {
         staffSet.add(name);
         staffWorkingMins[name] =
@@ -302,13 +310,13 @@ Future<Uint8List> buildReportPdf({
       if (c.descriptions.isNotEmpty) {
         return '$qPart ($mPart)\n${c.descriptions.join('; ')}';
       }
-      return '$qPart\n$mPart';
+      return '$qPart ($mPart)';
     }
 
     String formatTotalCell(ActivityTotal a) {
       final qPart =
           a.isCollection ? 'AED ${_q(a.quantity)}' : 'Qty: ${_q(a.quantity)}';
-      return '$qPart\n${a.minutes} min';
+      return '$qPart (${a.minutes} min)';
     }
 
     final grandTotalMins =
@@ -331,8 +339,8 @@ Future<Uint8List> buildReportPdf({
         [
           'Total Working Time',
           for (final u in staffNames)
-            '${staffWorkingMins[u] ?? 0} min\n(${fmtHours(staffWorkingMins[u] ?? 0)} hrs)',
-          '$grandTotalMins min\n(${fmtHours(grandTotalMins)} hrs)',
+            '${staffWorkingMins[u] ?? 0} min (${fmtHours(staffWorkingMins[u] ?? 0)} hrs)',
+          '$grandTotalMins min (${fmtHours(grandTotalMins)} hrs)',
         ],
     ];
 
@@ -355,7 +363,6 @@ Future<Uint8List> buildReportPdf({
     body.add(pw.Text(
         '* EMR-wise ledger minutes are a breakdown and are excluded from working-time totals.',
         style: pw.TextStyle(fontSize: 8, fontStyle: pw.FontStyle.italic)));
-    body.add(signatures());
   }
 
   doc.addPage(pw.MultiPage(
@@ -363,7 +370,7 @@ Future<Uint8List> buildReportPdf({
     maxPages: 2000,
     margin: const pw.EdgeInsets.all(28),
     header: (_) => header(),
-    footer: footer,
+    footer: reportFooter,
     build: (_) => body,
   ));
   return doc.save();
@@ -452,37 +459,41 @@ class _PayrollReportsDialogState extends State<PayrollReportsDialog> {
             for (final l in c.describe()) Text(l),
             const SizedBox(height: 8),
             for (final t in PdfReportType.values)
-              RadioListTile<PdfReportType>(
+              ListTile(
                 dense: true,
                 contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  type == t
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color: type == t ? TaskLogStyle.teal : TaskLogStyle.muted,
+                ),
                 title: Text(t.label),
-                value: t,
-                groupValue: type,
-                onChanged: busy ? null : (v) => setState(() => type = v!),
+                onTap: busy ? null : () => setState(() => type = t),
               ),
             if (busy) const LinearProgressIndicator(),
-            if (error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(error!,
-                    style: const TextStyle(color: Colors.redAccent)),
-              ),
-          ],
+              if (error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(error!,
+                      style: const TextStyle(color: Colors.redAccent)),
+                ),
+            ],
+          ),
         ),
-      ),
-      actions: [
-        TextButton(
-            onPressed: busy ? null : () => Navigator.pop(context),
-            child: const Text('Close')),
-        OutlinedButton.icon(
-            onPressed: busy ? null : () => _run(true),
-            icon: const Icon(Icons.download),
-            label: const Text('Download / share')),
-        FilledButton.icon(
-            onPressed: busy ? null : () => _run(false),
-            icon: const Icon(Icons.print),
-            label: const Text('Preview / print')),
-      ],
+        actions: [
+          TextButton(
+              onPressed: busy ? null : () => Navigator.pop(context),
+              child: const Text('Close')),
+          OutlinedButton.icon(
+              onPressed: busy ? null : () => _run(true),
+              icon: const Icon(Icons.download),
+              label: const Text('Download / share')),
+          FilledButton.icon(
+              onPressed: busy ? null : () => _run(false),
+              icon: const Icon(Icons.print),
+              label: const Text('Preview / print')),
+        ],
       ),
     );
   }

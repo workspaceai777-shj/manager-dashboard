@@ -13,6 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   API_BASE_URL: ${{ vars.TASKLOG_API_BASE_URL || 'https://tasklog-api.vercel.app' }}
   FIREBASE_API_KEY: ${{ vars.TASKLOG_FIREBASE_API_KEY || 'AIzaSyAeKzeuwjLr0GfC1dyS-mYnGlWCYnQnOPQ' }}
   FIREBASE_APP_ID: ${{ vars.TASKLOG_FIREBASE_APP_ID || '1:53646772905:web:684fea482d7b552030f7b8' }}

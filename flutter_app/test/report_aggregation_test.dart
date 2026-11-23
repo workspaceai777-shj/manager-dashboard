@@ -133,13 +133,6 @@ void main() {
       }
     }
   });
-}
-
-void pdfSafeTest() {
-  test('pdfSafe replaces unsupported characters', () {
-    expect(pdfSafe('A \u2014 B'), 'A - B');
-    expect(pdfSafe('\u0627'), '?');
-  });
 
   test('pdfSafe replaces unsupported characters', () {
     expect(pdfSafe('A \u2014 B'), 'A - B');
