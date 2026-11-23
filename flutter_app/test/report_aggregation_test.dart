@@ -42,13 +42,17 @@ void main() {
     expect(a.avgMinutesPerDay, 105);
   });
 
-  test('activity summary totals and staff count', () {
+  test('activity summary totals, staff count, and per-user cross-tab details', () {
     final t = buildActivitySummary(rows);
     final reg = t.firstWhere((x) => x.taskId == 'registrations');
     expect(reg.quantity, 7);
     expect(reg.minutes, 210);
     expect(reg.staffCount, 2);
     expect(reg.avgMinutesPerStaff, 105);
+    expect(reg.byUser['Asha']?.quantity, 6);
+    expect(reg.byUser['Asha']?.minutes, 180);
+    expect(reg.byUser['Ben']?.quantity, 1);
+    expect(reg.byUser['Ben']?.minutes, 30);
     expect(t.any((x) => x.taskId == 'enquiry_detail'), isFalse);
   });
 

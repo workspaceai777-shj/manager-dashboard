@@ -60,8 +60,7 @@ Future<Uint8List> buildReportPdf({
   final at = now ?? DateTime.now();
   final doc = pw.Document(title: type.title, author: generatedBy);
   final period = criteria.periodLabel(at);
-  final landscape = type != PdfReportType.activitySummary;
-  final format = landscape ? PdfPageFormat.a4.landscape : PdfPageFormat.a4;
+  final format = PdfPageFormat.a4.landscape;
   final base = pw.TextStyle(fontSize: 9);
   final bold = pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold);
 
@@ -251,27 +250,79 @@ Future<Uint8List> buildReportPdf({
     body.add(signatures());
   } else {
     final list = buildActivitySummary(rows);
-    body.add(pw.SizedBox(height: 6));
-    body.add(table([
+    final staffSet = <String>{};
+    final staffWorkingMins = <String, int>{};
+    for (final r in rows) {
+      final name = (r['employeeName'] ?? '').toString().trim();
+      if (name.isNotEmpty) {
+        staffSet.add(name);
+        staffWorkingMins[name] =
+            (staffWorkingMins[name] ?? 0) + countedMinutes(r);
+      }
+    }
+    final staffNames = staffSet.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    String formatCell(ActivityTotal a, UserActivityDetail? c) {
+      if (c == null ||
+          (c.quantity == 0 && c.minutes == 0 && c.descriptions.isEmpty)) {
+        return '-';
+      }
+      final qPart =
+          a.isCollection ? 'AED ${_q(c.quantity)}' : 'Qty: ${_q(c.quantity)}';
+      final mPart = '${c.minutes} min';
+      if (c.descriptions.isNotEmpty) {
+        return '$qPart ($mPart)\n${c.descriptions.join('; ')}';
+      }
+      return '$qPart\n$mPart';
+    }
+
+    String formatTotalCell(ActivityTotal a) {
+      final qPart =
+          a.isCollection ? 'AED ${_q(a.quantity)}' : 'Qty: ${_q(a.quantity)}';
+      return '$qPart\n${a.minutes} min';
+    }
+
+    final grandTotalMins =
+        staffWorkingMins.values.fold<int>(0, (sum, m) => sum + m);
+
+    final headers = <String>[
       'Activity',
-      'Total qty',
-      'Total min',
-      'Staff',
-      'Avg min / staff'
-    ], [
+      ...staffNames,
+      'Total',
+    ];
+
+    final tableRows = <List<String>>[
       for (final a in list)
         [
           a.isLedger ? '${a.title} *' : a.title,
-          a.isCollection ? 'AED ${_q(a.quantity)}' : _q(a.quantity),
-          '${a.minutes}',
-          '${a.staffCount}',
-          a.avgMinutesPerStaff.toStringAsFixed(1),
-        ]
-    ], align: {
-      for (var i = 1; i < 5; i++) i: pw.Alignment.centerRight
-    }, widths: {
-      0: const pw.FlexColumnWidth(4)
-    }));
+          for (final u in staffNames) formatCell(a, a.byUser[u]),
+          formatTotalCell(a),
+        ],
+      if (staffNames.isNotEmpty)
+        [
+          'Total Working Time',
+          for (final u in staffNames)
+            '${staffWorkingMins[u] ?? 0} min\n(${fmtHours(staffWorkingMins[u] ?? 0)} hrs)',
+          '$grandTotalMins min\n(${fmtHours(grandTotalMins)} hrs)',
+        ],
+    ];
+
+    body.add(pw.SizedBox(height: 6));
+    body.add(table(
+      headers,
+      tableRows,
+      align: {
+        0: pw.Alignment.centerLeft,
+        for (var i = 1; i <= staffNames.length + 1; i++) i: pw.Alignment.center,
+      },
+      widths: {
+        0: const pw.FlexColumnWidth(2.6),
+        for (var i = 1; i <= staffNames.length; i++)
+          i: const pw.FlexColumnWidth(1.2),
+        staffNames.length + 1: const pw.FlexColumnWidth(1.3),
+      },
+    ));
     body.add(pw.SizedBox(height: 4));
     body.add(pw.Text(
         '* EMR-wise ledger minutes are a breakdown and are excluded from working-time totals.',
@@ -345,7 +396,9 @@ class _PayrollReportsDialogState extends State<PayrollReportsDialog> {
         await Printing.sharePdf(bytes: bytes, filename: name);
       } else {
         await Printing.layoutPdf(
-            name: name, format: PdfPageFormat.a4, onLayout: (_) async => bytes);
+            name: name,
+            format: PdfPageFormat.a4.landscape,
+            onLayout: (_) async => bytes);
       }
     } catch (e) {
       if (mounted) setState(() => error = friendlyReportError(e));

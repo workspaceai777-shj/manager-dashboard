@@ -221,12 +221,20 @@ List<StaffSummary> buildStaffSummary(List<Map<String, dynamic>> rows) {
 
 // -------------------------------------------------------- activity summary
 
+class UserActivityDetail {
+  double quantity = 0;
+  int minutes = 0;
+  int rows = 0;
+  final List<String> descriptions = [];
+}
+
 class ActivityTotal {
   ActivityTotal(this.taskId, this.title);
   final String taskId, title;
   double quantity = 0;
   int minutes = 0;
   final Set<String> staff = {};
+  final Map<String, UserActivityDetail> byUser = {};
   bool get isLedger => ledgerTaskIds.contains(taskId);
   bool get isCollection => taskId == 'collection';
   int get staffCount => staff.length;
@@ -244,9 +252,25 @@ List<ActivityTotal> buildActivitySummary(List<Map<String, dynamic>> rows) {
             id,
             TaskLogStyle.activityTitle(
                 _s(r['branch']), _s(r['category']), id)));
-    t.quantity += _num(r['quantity']);
-    t.minutes += _mins(r['hours']);
+    final q = _num(r['quantity']);
+    final m = _mins(r['hours']);
+    t.quantity += q;
+    t.minutes += m;
     t.staff.add(_staffKey(r));
+
+    final userName = _s(r['employeeName']).isNotEmpty
+        ? _s(r['employeeName'])
+        : _staffKey(r);
+    if (userName.isNotEmpty) {
+      final cell = t.byUser.putIfAbsent(userName, UserActivityDetail.new);
+      cell.quantity += q;
+      cell.minutes += m;
+      cell.rows++;
+      if (id == 'other_tasks') {
+        final desc = _s(r['remarks']);
+        if (desc.isNotEmpty) cell.descriptions.add(desc);
+      }
+    }
   }
   return map.values.toList()
     ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
