@@ -317,7 +317,7 @@ const accounts=[
   ['accounts_staff_attendance','Staff attendance Ontario and Whitefox'],
   ['accounts_towel_import_invoice','Towel import invoice preparation, cash collect from customer and excel update'],
   ['accounts_medicine_collect_whitefox','Medicine collect from supplier for whitefox and invoice updated'],
-  ['accounts_month_end_closing_deposit','Month end closing and cash handover for deposit'],
+  ['accounts_month_end_closing_deposit','Travel collection closing and cash handover for deposit'],
   ['accounts_whitefox_consignment_sale','White fox Consignment basis sale checking and update'],
   ['accounts_petty_cash_voucher_entry','Petty cash voucher entry and filing'],
   ['accounts_petty_cash_excel','Petty cash excel'],

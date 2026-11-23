@@ -245,7 +245,7 @@ class TaskLogStyle {
       'accounts_medicine_collect_whitefox':
           'Medicine collect from supplier for whitefox and invoice updated',
       'accounts_month_end_closing_deposit':
-          'Month end closing and cash handover for deposit',
+          'Travel collection closing and cash handover for deposit',
       'accounts_whitefox_consignment_sale':
           'White fox Consignment basis sale checking and update',
       'accounts_petty_cash_voucher_entry':

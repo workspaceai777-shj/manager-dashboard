@@ -96,7 +96,7 @@ class FakeStaffApi extends StaffApi {
         },
         {
           'id': 'accounts_month_end_closing_deposit',
-          'name': 'Month end closing and cash handover for deposit'
+          'name': 'Travel collection closing and cash handover for deposit'
         },
         {
           'id': 'accounts_whitefox_consignment_sale',
@@ -449,6 +449,9 @@ void main() {
     expect(find.text('Petty Cash Filing Completed'), findsNothing);
     expect(find.text('Monthly collection excel'), findsNothing);
     expect(find.text('Zoho updation'), findsOneWidget);
+    expect(
+        find.text('Travel collection closing and cash handover for deposit'),
+        findsOneWidget);
     expect(find.text('Purchase request for one month'), findsOneWidget);
     expect(find.text('Other task carried out'), findsWidgets);
     for (int i = 1; i <= 19; i++) {
@@ -478,6 +481,37 @@ void main() {
         find.text(
             'Patient Registrations (including treatment chart and case sheet)'),
         findsOneWidget);
+
+    // Verify Start/End timer increments Quantity on each Start and adds Minutes on each End
+    final regCard = find.ancestor(
+      of: find.text(
+          'Patient Registrations (including treatment chart and case sheet)'),
+      matching: find.byType(Card),
+    );
+    await tester.tap(find.byKey(const ValueKey('start-registrations')));
+    await tester.pump();
+    expect(
+      tester
+          .widget<TextField>(find.descendant(
+              of: regCard, matching: find.widgetWithText(TextField, 'Quantity')))
+          .controller!
+          .text,
+      '1',
+    );
+    await tester.tap(find.byKey(const ValueKey('end-registrations')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('start-registrations')));
+    await tester.pump();
+    expect(
+      tester
+          .widget<TextField>(find.descendant(
+              of: regCard, matching: find.widgetWithText(TextField, 'Quantity')))
+          .controller!
+          .text,
+      '2',
+    );
+    await tester.tap(find.byKey(const ValueKey('end-registrations')));
+    await tester.pump();
 
     // Enter Ledger Updated (R4) (including for insurance) = 5, Hours = 1.5 and save
     final ledgerCard = find.ancestor(

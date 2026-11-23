@@ -368,10 +368,17 @@ class _PortalState extends State<Portal> {
     }
   }
 
-  void _startTimer(String key) {
+  void _startTimer(String key, {TextEditingController? qtyCtrl}) {
     setState(() {
       _running[key] = DateTime.now();
       _recordTime(key, start: true);
+      if (qtyCtrl != null) {
+        final existingQty = double.tryParse(qtyCtrl.text.trim()) ?? 0;
+        final nextQty = (existingQty < 0 ? 0 : existingQty) + 1;
+        qtyCtrl.text = nextQty == nextQty.roundToDouble()
+            ? nextQty.toInt().toString()
+            : nextQty.toStringAsFixed(2);
+      }
     });
     _tick.value = DateTime.now();
     _ensureTicker();
@@ -402,7 +409,9 @@ class _PortalState extends State<Portal> {
       '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
   Widget _timerControls(String key, TextEditingController ctrl,
-      {required String startKey, required String endKey}) {
+      {required String startKey,
+      required String endKey,
+      TextEditingController? qtyCtrl}) {
     final start = _running[key];
     final running = start != null;
     const pad = EdgeInsets.symmetric(horizontal: 10, vertical: 6);
@@ -419,7 +428,8 @@ class _PortalState extends State<Portal> {
                 padding: pad,
                 minimumSize: const Size(0, 34),
                 backgroundColor: TaskLogStyle.teal),
-            onPressed: running ? null : () => _startTimer(key),
+            onPressed:
+                running ? null : () => _startTimer(key, qtyCtrl: qtyCtrl),
             icon: const Icon(Icons.play_arrow, size: 18),
             label: const Text('Start'),
           ),
@@ -1388,7 +1398,9 @@ class _PortalState extends State<Portal> {
                             id != 'enquiries' && !isYesNo && !isSummary;
                         final timer = showTimer
                             ? _timerControls(id, hours[id]!,
-                                startKey: 'start-$id', endKey: 'end-$id')
+                                startKey: 'start-$id',
+                                endKey: 'end-$id',
+                                qtyCtrl: id == 'collection' ? null : qty[id])
                             : null;
                         if (compact) {
                           return Column(
