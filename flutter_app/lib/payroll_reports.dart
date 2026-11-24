@@ -190,7 +190,9 @@ Future<Uint8List> buildReportPdf({
           userBody.add(table([
             'Call no.',
             'Caller',
+            'Phone',
             'Status',
+            'Remarks',
             'Start',
             'End',
             'Min'
@@ -199,12 +201,16 @@ Future<Uint8List> buildReportPdf({
               [
                 '${e['emr'] ?? ''}',
                 '${e['callerName'] ?? ''}',
+                '${e['callerPhone'] ?? ''}',
                 '${e['callStatus'] ?? ''}',
+                '${e['remarks'] ?? ''}',
                 _t(e['startTime']),
                 _t(e['endTime']),
                 '${((double.tryParse('${e['hours']}') ?? 0) * 60).round()}',
               ]
-          ]));
+          ], widths: {
+            4: const pw.FlexColumnWidth(2.5),
+          }));
         }
         if (d.ledger.isNotEmpty) {
           userBody.add(pw.SizedBox(height: 3));

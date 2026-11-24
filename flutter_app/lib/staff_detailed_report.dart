@@ -1081,7 +1081,10 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
 
   /// Table-style identifier + start/end block for an enquiry or EMR row.
   Widget rowTimeTable(Map<String, dynamic> d,
-      {required String idLabel, required String id, String? name}) {
+      {required String idLabel,
+      required String id,
+      String? name,
+      String? phone}) {
     Widget cell(String label, String value) => Container(
           constraints: const BoxConstraints(minWidth: 120),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1114,6 +1117,7 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
         children: [
           cell(idLabel, id.isEmpty ? '—' : id),
           if (name != null) cell('Caller', name.isEmpty ? '—' : name),
+          if (phone != null) cell('Phone', phone.isEmpty ? '—' : phone),
           cell('Start time', formatRowTime(d['startTime'])),
           cell('End time', formatRowTime(d['endTime'])),
         ],
@@ -1167,6 +1171,22 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                               fontWeight: FontWeight.w600,
                               fontSize: 12.5,
                               color: TaskLogStyle.ink)),
+                      if ((d['callerPhone'] ?? '').toString().trim().isNotEmpty)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.phone_outlined,
+                                size: 13, color: TaskLogStyle.teal),
+                            const SizedBox(width: 4),
+                            Text(
+                              (d['callerPhone']).toString().trim(),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12.5,
+                                  color: TaskLogStyle.ink),
+                            ),
+                          ],
+                        ),
                       if ((d['callStatus'] ?? '').toString().trim().isNotEmpty)
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -1192,7 +1212,8 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                   rowTimeTable(d,
                       idLabel: 'Call No.',
                       id: (d['emr'] ?? '').toString().trim(),
-                      name: (d['callerName'] ?? '').toString().trim()),
+                      name: (d['callerName'] ?? '').toString().trim(),
+                      phone: (d['callerPhone'] ?? '').toString().trim()),
                   if ((d['remarks'] ?? '').toString().trim().isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),

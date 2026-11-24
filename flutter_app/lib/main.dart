@@ -408,12 +408,38 @@ class _PortalState extends State<Portal> {
   String _hhmm(DateTime d) =>
       '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
+  DateTime? _savedStartForKey(String key) {
+    if (key.startsWith('enq-')) {
+      final i = int.tryParse(key.substring(4));
+      return (i != null && i < enqStart.length) ? enqStart[i] : null;
+    }
+    if (key.startsWith('emr-')) {
+      final i = int.tryParse(key.substring(4));
+      return (i != null && i < emrStart.length) ? emrStart[i] : null;
+    }
+    return null;
+  }
+
+  DateTime? _savedEndForKey(String key) {
+    if (key.startsWith('enq-')) {
+      final i = int.tryParse(key.substring(4));
+      return (i != null && i < enqEnd.length) ? enqEnd[i] : null;
+    }
+    if (key.startsWith('emr-')) {
+      final i = int.tryParse(key.substring(4));
+      return (i != null && i < emrEnd.length) ? emrEnd[i] : null;
+    }
+    return null;
+  }
+
   Widget _timerControls(String key, TextEditingController ctrl,
       {required String startKey,
       required String endKey,
       TextEditingController? qtyCtrl}) {
     final start = _running[key];
     final running = start != null;
+    final savedStart = _savedStartForKey(key);
+    final savedEnd = _savedEndForKey(key);
     const pad = EdgeInsets.symmetric(horizontal: 10, vertical: 6);
     return Wrap(
       spacing: 6,
@@ -452,6 +478,11 @@ class _PortalState extends State<Portal> {
                 'Started ${_hhmm(start)} · Elapsed ${formatElapsed(now.difference(start))}',
                 style:
                     const TextStyle(color: TaskLogStyle.muted, fontSize: 12)),
+          )
+        else if (savedStart != null || savedEnd != null)
+          Text(
+            'Start: ${formatRowTime(savedStart?.toIso8601String())} · End: ${formatRowTime(savedEnd?.toIso8601String())}',
+            style: const TextStyle(color: TaskLogStyle.muted, fontSize: 12),
           ),
       ],
     );

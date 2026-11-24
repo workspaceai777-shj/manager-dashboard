@@ -936,6 +936,7 @@ void main() {
             {String emr = '',
             String remarks = '',
             String caller = '',
+            String phone = '',
             String status = ''}) =>
         {
           'uid': 'staff-farzana',
@@ -950,6 +951,7 @@ void main() {
           'quantity': qty,
           'hours': hrs,
           'callerName': caller,
+          'callerPhone': phone,
           'callStatus': status,
         };
     adminApi.allEntries
@@ -958,6 +960,7 @@ void main() {
       ..add(row('enquiry_detail', 1, 20 / 60,
           emr: '1',
           caller: 'Mrs Sharma',
+          phone: '+971 50 471 3459',
           status: 'Appointment booked',
           remarks: 'Asked about braces'))
       ..add(row('enquiry_detail', 1, 40 / 60,
@@ -981,6 +984,7 @@ void main() {
     // Detailed report: details are listed beneath activity "Enquiries Handled".
     expect(find.text('Enquiry details (2)'), findsOneWidget);
     expect(find.text('Mrs Sharma'), findsNWidgets(2));
+    expect(find.text('+971 50 471 3459'), findsNWidgets(2));
     expect(find.text('Appointment booked'), findsOneWidget);
     expect(find.text('Remarks: Asked about braces'), findsOneWidget);
     expect(find.text('Mr Khan'), findsNWidgets(2));

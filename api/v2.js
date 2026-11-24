@@ -341,11 +341,24 @@ const REPLACE_MARKER = '__report_replace__';
 const reportKey = (e) => [e.uid,e.date,e.branch,e.category].join('\u001f');
 function activeEntries(records) {
   const current = new Map();
+  const prevTimed = new Map();
   for (const row of records) {
     const key = reportKey(row);
     if (row.taskId === REPLACE_MARKER) {
       current.set(key, []);
     } else {
+      const itemKey = `${key}\u001f${row.taskId}\u001f${row.emr || ''}`;
+      if (row.startTime || row.endTime) {
+        const prev = prevTimed.get(itemKey);
+        prevTimed.set(itemKey, {
+          startTime: row.startTime || prev?.startTime || null,
+          endTime: row.endTime || prev?.endTime || null,
+        });
+      } else if (prevTimed.has(itemKey)) {
+        const saved = prevTimed.get(itemKey);
+        if (!row.startTime && saved.startTime) row.startTime = saved.startTime;
+        if (!row.endTime && saved.endTime) row.endTime = saved.endTime;
+      }
       if (!current.has(key)) current.set(key, []);
       current.get(key).push(row);
     }

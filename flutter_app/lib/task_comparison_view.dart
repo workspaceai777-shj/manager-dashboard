@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'staff_detailed_report.dart' show formatRowTime;
 import 'tasklog_style.dart';
 
 /// Admin Activity & Task Comparison page.
@@ -51,6 +52,8 @@ class _StaffTaskMetric {
   int entryCount = 0;
   final List<String> emrList = [];
   final List<String> remarksList = [];
+  final List<Map<String, dynamic>> emrDetails = [];
+  final List<Map<String, dynamic>> enquiryDetails = [];
 
   // Dedicated fields for ledger tracking to prevent duplicate counting
   double parentLedgerQty = 0.0;
@@ -372,6 +375,7 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
           stat.hasEmrBreakdown = true;
           if (emrStr.isNotEmpty && !stat.emrList.contains(emrStr)) {
             stat.emrList.add(emrStr);
+            stat.emrDetails.add(e);
           }
           if (remStr.isNotEmpty && !stat.remarksList.contains(remStr)) {
             stat.remarksList.add(remStr);
@@ -380,6 +384,48 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
       } else {
         stat.quantity += qtyVal;
         stat.hours += hrsVal;
+      }
+    }
+
+    // Attach enquiry_detail breakdown rows to the corresponding 'enquiries' group
+    for (final raw in widget.records) {
+      if (raw is! Map) continue;
+      final e = Map<String, dynamic>.from(raw);
+      if ((e['taskId'] ?? '').toString().trim() != 'enquiry_detail') continue;
+      final emp = (e['employeeName'] ?? '').toString().trim();
+      if (emp.isEmpty || emp.toLowerCase() == 'administrator') continue;
+      if (branch != 'ALL' && e['branch'] != branch) continue;
+      if (category != 'ALL' && e['category'] != category) continue;
+      if (employee != 'ALL' && emp != employee) continue;
+      final d = TaskLogStyle.parseEntryDate(e['Task Date'] ?? e['date']);
+      if (singleDate != null) {
+        if (d == null ||
+            d.year != singleDate!.year ||
+            d.month != singleDate!.month ||
+            d.day != singleDate!.day) {
+          continue;
+        }
+      } else if (todayOnly) {
+        final today = DateTime.now();
+        if (d == null ||
+            d.year != today.year ||
+            d.month != today.month ||
+            d.day != today.day) {
+          continue;
+        }
+      } else if (period != null) {
+        if (d == null) continue;
+        final start = DateTime(
+            period!.start.year, period!.start.month, period!.start.day);
+        final end = DateTime(
+            period!.end.year, period!.end.month, period!.end.day, 23, 59, 59);
+        if (d.isBefore(start) || d.isAfter(end)) continue;
+      }
+      final cat = (e['category'] ?? 'FRONT DESK').toString().trim();
+      final group = map['$cat|enquiries'];
+      final stat = group?.staffMap[emp];
+      if (stat != null) {
+        stat.enquiryDetails.add(e);
       }
     }
 
@@ -1207,6 +1253,85 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
                                   height: 1.35,
                                 ),
                               ),
+                              for (final d in staff.emrDetails.where((x) =>
+                                  (x['startTime'] ?? '')
+                                      .toString()
+                                      .isNotEmpty ||
+                                  (x['endTime'] ?? '').toString().isNotEmpty))
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 3),
+                                  child: Text(
+                                    'EMR ${(d['emr'] ?? '').toString().trim()}: Start ${formatRowTime(d['startTime'])} · End ${formatRowTime(d['endTime'])}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: TaskLogStyle.muted,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (staff.enquiryDetails.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0A1524),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color:
+                                    TaskLogStyle.teal.withValues(alpha: 0.3)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Enquiry calls (${staff.enquiryDetails.length}):',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: TaskLogStyle.teal,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              for (final d in staff.enquiryDetails)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 3),
+                                  child: Text(
+                                    [
+                                      '#${(d['emr'] ?? '').toString().trim()}',
+                                      if ((d['callerName'] ?? '')
+                                          .toString()
+                                          .trim()
+                                          .isNotEmpty)
+                                        (d['callerName']).toString().trim(),
+                                      if ((d['callerPhone'] ?? '')
+                                          .toString()
+                                          .trim()
+                                          .isNotEmpty)
+                                        'Phone: ${(d['callerPhone']).toString().trim()}',
+                                      if ((d['callStatus'] ?? '')
+                                          .toString()
+                                          .trim()
+                                          .isNotEmpty)
+                                        (d['callStatus']).toString().trim(),
+                                      if ((d['startTime'] ?? '')
+                                              .toString()
+                                              .isNotEmpty ||
+                                          (d['endTime'] ?? '')
+                                              .toString()
+                                              .isNotEmpty)
+                                        'Start ${formatRowTime(d['startTime'])} · End ${formatRowTime(d['endTime'])}',
+                                    ].join('  |  '),
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      color: TaskLogStyle.ink,
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
                         ),
