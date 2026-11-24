@@ -321,7 +321,6 @@ const accounts=[
   ['accounts_whitefox_consignment_sale','White fox Consignment basis sale checking and update'],
   ['accounts_petty_cash_voucher_entry','Petty cash voucher entry and filing'],
   ['accounts_petty_cash_excel','Petty cash excel'],
-  ['accounts_monthly_collection_excel','Monthly collection excel'],
   ['accounts_purchase_request_month','Purchase request for one month']
 ];
 const doctorsZone=[
@@ -454,13 +453,14 @@ export default async function handler(req,res){
       if(!check(body.branch,body.category))return result(res,403,{error:'Category not assigned'});
       if(!validDate(body.date)||!Array.isArray(body.entries)||body.entries.length>150)return result(res,400,{error:'Invalid date or entries'});
       const allowed=new Set(activities(body.branch,body.category).map(t=>t.id));
+      const isAccounts=body.category==='ACCOUNTS';
       allowed.add('other_tasks');
       allowed.add('cards_arranged');
+      if(isAccounts)allowed.add('accounts_monthly_collection_excel');
       // Per-call detail rows only belong under the "Enquiries Handled" activity.
       if(allowed.has('enquiries'))allowed.add('enquiry_detail');
       const rows=[];
       const seenLedger=new Set();
-      const isAccounts=body.category==='ACCOUNTS';
       const maxOther=isAccounts?5:1;
       const otherSlots=new Set();
       for(const e of body.entries){
@@ -494,12 +494,14 @@ export default async function handler(req,res){
         if(task==='other_tasks'){
           if(remarks.length>500)return result(res,400,{error:'Other task description too long (max 500)'});
           if(otherSlots.size>=maxOther)return result(res,400,{error:'Too many other tasks'});
-          // ACCOUNTS: emr carries the slot '1'..'5' ('' = slot 1). Others: no slot.
+          // ACCOUNTS: emr carries the slot '1'..'5' ('' = slot 1). Others: '' or '1' = slot 1.
           let slot='';
           if(isAccounts){
             slot=emr===''?'1':emr;
             if(!/^[1-5]$/.test(slot))return result(res,400,{error:'Invalid other task slot (1-5)'});
-          } else if(emr) return result(res,400,{error:'EMR is only accepted for EMR-wise preparation'});
+          } else if(emr && emr !== '1') {
+            return result(res,400,{error:'EMR is only accepted for EMR-wise preparation'});
+          }
           if(otherSlots.has(slot))return result(res,400,{error:'Duplicate other task slot'});
           otherSlots.add(slot);
           rows.push([crypto.randomUUID(),new Date().toISOString(),uid,me.name,body.date,body.branch,body.category,task,slot,remarks,normalizedQuantity,hours,body.date]);

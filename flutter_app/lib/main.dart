@@ -653,8 +653,11 @@ class _PortalState extends State<Portal> {
         'category': nextCategory,
       });
       var nextTasks = List<dynamic>.from(response['tasks'] ?? [])
-          .where((t) => t['id'].toString() != 'accounts_r4_ledgers')
-          .map((t) {
+          .where((t) {
+        final id = t['id'].toString();
+        return id != 'accounts_r4_ledgers' &&
+            id != 'accounts_monthly_collection_excel';
+      }).map((t) {
         final item = Map<String, dynamic>.from(t as Map);
         if (item['id'] == 'accounts_insurance_ledgers') {
           item['name'] = 'Individual ledgers for insurance showed';
@@ -930,9 +933,9 @@ class _PortalState extends State<Portal> {
     }
   }
 
-  /// The summary card (activity "Ledger Updated") is derived from EMR rows.
+  /// The summary card (activity "Ledger Updated" or "Insurance EMRwise Updated") is derived from EMR rows.
   bool _isLedgerSummary(String id) =>
-      id == ledgerSummaryTaskId && emrTaskId != null;
+      ledgerSummaryTaskIds.contains(id) && emrTaskId != null;
 
   LedgerTotals _ledgerTotals() => computeLedgerTotals(
       [for (final c in emr) c.text], [for (final c in mins) c.text]);
@@ -954,6 +957,18 @@ class _PortalState extends State<Portal> {
 
   Future<void> saveTasks() async {
     if (saving) return;
+    for (final key in _running.keys.toList()) {
+      if (key.startsWith('enq-')) {
+        final i = int.tryParse(key.substring(4));
+        if (i != null && i < enqMins.length) _endTimer(key, enqMins[i]);
+      } else if (key.startsWith('emr-')) {
+        final i = int.tryParse(key.substring(4));
+        if (i != null && i < mins.length) _endTimer(key, mins[i]);
+      } else {
+        final ctrl = hours.putIfAbsent(key, () => TextEditingController());
+        _endTimer(key, ctrl);
+      }
+    }
     final data = <Map<String, dynamic>>[];
     for (final task in tasks) {
       final id = task['id'].toString();
@@ -1001,15 +1016,15 @@ class _PortalState extends State<Portal> {
     if (activeEmrTask != null) {
       for (int i = 0; i < emr.length; i++) {
         final mText = mins[i].text.trim();
-        final parsedM = mText.isEmpty ? 0 : (int.tryParse(mText) ?? 0);
-        final m = parsedM < 0 ? 0 : parsedM;
+        final parsedM = mText.isEmpty ? 0.0 : (double.tryParse(mText) ?? 0.0);
+        final m = parsedM < 0 ? 0.0 : parsedM;
         if (emr[i].text.trim().isNotEmpty) {
           data.add({
             'taskId': activeEmrTask,
             'emr': emr[i].text.trim(),
             'remarks': remark[i].text.trim(),
             'quantity': 1,
-            'hours': m > 0 ? m / 60 : 0,
+            'hours': m > 0 ? m / 60.0 : 0.0,
             ..._timeFields(emrStart, emrEnd, i),
           });
         }
@@ -2203,8 +2218,12 @@ LedgerTotals computeEnquiryTotals(List<EnquiryRowInput> rows) {
   return LedgerTotals(count, total);
 }
 
-/// Activity card whose totals come from the EMR-wise ledger rows.
+/// Activity cards whose totals come from the EMR-wise ledger rows.
 const String ledgerSummaryTaskId = 'ledger_updated';
+const Set<String> ledgerSummaryTaskIds = {
+  'ledger_updated',
+  'insurance_emrwise',
+};
 
 class LedgerTotals {
   const LedgerTotals(this.count, this.minutes);

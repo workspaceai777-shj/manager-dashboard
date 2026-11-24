@@ -207,21 +207,92 @@ class FakeStaffApi extends StaffApi {
         final incoming = List<Map<String, dynamic>>.from(
             (payload['entries'] as List)
                 .map((e) => Map<String, dynamic>.from(e as Map)));
+        // Exact v2.js validation check
+        final allowed =
+            catalogFor(b, c).map((t) => t['id'].toString()).toSet()
+              ..add('other_tasks')
+              ..add('cards_arranged');
+        if (c == 'ACCOUNTS') {
+          allowed.add('accounts_monthly_collection_excel');
+        }
+        if (allowed.contains('enquiries')) {
+          allowed.add('enquiry_detail');
+        }
+        final isAccounts = c == 'ACCOUNTS';
+        final maxOther = isAccounts ? 5 : 1;
+        final otherSlots = <String>{};
+        final seenLedger = <String>{};
+        for (final row in incoming) {
+          final task = (row['taskId'] ?? '').toString();
+          if (!allowed.contains(task)) {
+            throw Exception(
+                'Invalid task quantity or hours (task: $task, not allowed for this category)');
+          }
+          final emr = (row['emr'] ?? '').toString().trim();
+          final remarks = (row['remarks'] ?? '').toString().trim();
+          if (task == 'enquiry_detail') {
+            final phone = (row['callerPhone'] ?? '').toString().trim();
+            if (phone.length > 30 ||
+                !RegExp(r'^[0-9+\-() ]*$').hasMatch(phone)) {
+              throw Exception('Invalid caller phone');
+            }
+            continue;
+          }
+          if (task == 'other_tasks') {
+            if (remarks.length > 500) {
+              throw Exception('Other task description too long (max 500)');
+            }
+            if (otherSlots.length >= maxOther) {
+              throw Exception('Too many other tasks');
+            }
+            var slot = '';
+            if (isAccounts) {
+              slot = emr.isEmpty ? '1' : emr;
+              if (!RegExp(r'^[1-5]$').hasMatch(slot)) {
+                throw Exception('Invalid other task slot (1-5)');
+              }
+            } else if (emr.isNotEmpty && emr != '1') {
+              throw Exception('EMR is only accepted for EMR-wise preparation');
+            }
+            if (otherSlots.contains(slot)) {
+              throw Exception('Duplicate other task slot');
+            }
+            otherSlots.add(slot);
+            continue;
+          }
+          if (task == 'ledger_prepared' || task == 'insurance_ledger_emr') {
+            if (emr.isEmpty) continue;
+            final key = '$task:$emr';
+            if (seenLedger.contains(key)) {
+              throw Exception('Duplicate EMR in submission');
+            }
+            seenLedger.add(key);
+          } else if (emr.isNotEmpty) {
+            throw Exception('EMR is only accepted for EMR-wise preparation');
+          }
+        }
         // Replace previous entries for (uid, date, branch, category) without duplicating
         allEntries.removeWhere((e) =>
             e['uid'] == uid &&
             e['branch'] == b &&
             e['category'] == c &&
             e['date'] == d);
+        final savedRows = <Map<String, dynamic>>[];
         for (final row in incoming) {
-          allEntries.add({
+          final task = (row['taskId'] ?? '').toString();
+          final rawEmr = (row['emr'] ?? '').toString().trim();
+          final emrVal = task == 'other_tasks'
+              ? (isAccounts ? (rawEmr.isEmpty ? '1' : rawEmr) : '')
+              : rawEmr;
+          final saved = {
             'uid': uid,
             'employeeName': name,
             'date': d,
+            'Task Date': d,
             'branch': b,
             'category': c,
-            'taskId': row['taskId'],
-            'emr': row['emr'] ?? '',
+            'taskId': task,
+            'emr': emrVal,
             'remarks': row['remarks'] ?? '',
             'quantity': row['quantity'],
             'hours': row['hours'],
@@ -230,9 +301,11 @@ class FakeStaffApi extends StaffApi {
             'callStatus': row['callStatus'] ?? '',
             if (row['startTime'] != null) 'startTime': row['startTime'],
             if (row['endTime'] != null) 'endTime': row['endTime'],
-          });
+          };
+          allEntries.add(saved);
+          savedRows.add(saved);
         }
-        return {'saved': incoming.length};
+        return {'saved': savedRows.length, 'entries': savedRows};
       case 'dashboard':
         if (role != 'ADMIN') {
           throw Exception('Administrator access required');
@@ -998,6 +1071,290 @@ void main() {
     expect(find.text('Total Time: 1.92 hrs (115 min)'), findsNothing);
     // The activity keeps its own typed quantity.
     expect(find.text('Qty: 3'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'All categories (FRONT DESK, INSURANCE USER, ACCOUNTS, DOCTOR\'S ZONE) save all activities, other_tasks, EMR rows, and auto-stop timers properly',
+      (tester) async {
+    addTearDown(tester.view.reset);
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(1280, 1600);
+    final staffApi = FakeStaffApi(
+      role: 'STAFF',
+      uid: 'staff-all-test',
+      name: 'Prince',
+    );
+    await tester.pumpWidget(MaterialApp(
+      theme: TaskLogStyle.dark,
+      home: Portal(key: const ValueKey('all-cat-save'), api: staffApi),
+    ));
+    await tester.pumpAndSettle();
+
+    Future<void> clickSaveAndConfirm() async {
+      final saveBtn = find.text('Save daily report');
+      await tester.ensureVisible(saveBtn);
+      await tester.tap(saveBtn);
+      await tester.pumpAndSettle();
+      expect(find.text('Confirm report date'), findsOneWidget);
+      await tester.tap(find.text('Confirm & Save'));
+      await tester.pumpAndSettle();
+    }
+
+    // 1. ONT-BB FRONT DESK (standard tasks + collection + EMR rows + other_tasks + running timer auto-stop)
+    await tester.tap(find.text('ONT-BB').first);
+    await tester.pumpAndSettle();
+
+    // Start timer on 'registrations' and leave it running when clicking Save
+    await tester.tap(find.byKey(const ValueKey('start-registrations')));
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // Enter Daily collection (AED)
+    final collCard = find.byKey(const ValueKey('ONT-BB|FRONT DESK|collection'));
+    await tester.enterText(
+        find.descendant(
+            of: collCard, matching: find.widgetWithText(TextField, 'AED')),
+        '1525.50');
+    await tester.enterText(
+        find.descendant(
+            of: collCard, matching: find.widgetWithText(TextField, 'Minutes')),
+        '20');
+
+    // Add an EMR row
+    await tester.ensureVisible(find.text('Add EMR'));
+    await tester.tap(find.text('Add EMR'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.widgetWithText(TextField, 'EMR No.').first, 'BB-101');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Remarks').first, 'Consultation');
+    await tester.tap(find.byKey(const ValueKey('emr-start-0')));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byKey(const ValueKey('emr-end-0')));
+    await tester.pumpAndSettle();
+
+    // Fill Other task carried out (non-ACCOUNTS category!)
+    final otherField = find.widgetWithText(TextField, 'Other task carried out');
+    await tester.ensureVisible(otherField);
+    await tester.enterText(otherField, 'Organized reception brochures');
+    final otherCard =
+        find.ancestor(of: otherField, matching: find.byType(Card)).first;
+    await tester.enterText(
+        find.descendant(
+            of: otherCard,
+            matching: find.widgetWithText(TextField, 'Minutes')),
+        '15');
+
+    await clickSaveAndConfirm();
+
+    final bbSaved = staffApi.allEntries
+        .where((e) =>
+            e['uid'] == 'staff-all-test' &&
+            e['branch'] == 'ONT-BB' &&
+            e['category'] == 'FRONT DESK')
+        .toList();
+    expect(bbSaved.any((e) => e['taskId'] == 'registrations'), isTrue);
+    final regEntry = bbSaved.firstWhere((e) => e['taskId'] == 'registrations');
+    expect(regEntry['quantity'], 1);
+    expect(regEntry['startTime'], isNotNull);
+    expect(regEntry['endTime'], isNotNull,
+        reason: 'Running timer was auto-stopped on save');
+    final collEntry = bbSaved.firstWhere((e) => e['taskId'] == 'collection');
+    expect(collEntry['quantity'], 1525.50);
+    final ledgerSummary =
+        bbSaved.firstWhere((e) => e['taskId'] == 'ledger_updated');
+    expect(ledgerSummary['quantity'], 1);
+    final ledgerEmr =
+        bbSaved.firstWhere((e) => e['taskId'] == 'ledger_prepared');
+    expect(ledgerEmr['emr'], 'BB-101');
+    expect(ledgerEmr['startTime'], isNotNull);
+    expect(ledgerEmr['endTime'], isNotNull);
+    final bbOther = bbSaved.firstWhere((e) => e['taskId'] == 'other_tasks');
+    expect(bbOther['remarks'], 'Organized reception brochures');
+    expect(bbOther['hours'], closeTo(15 / 60, 1e-6));
+
+    // Verify restored on entry screen
+    expect(find.text('Organized reception brochures'), findsOneWidget);
+
+    // 2. ONT-BB INSURANCE USER (standard insurance tasks + insurance_ledger_emr -> insurance_emrwise + other_tasks)
+    await tester.ensureVisible(find.text('ONT-BB — FRONT DESK'));
+    await tester.tap(find.text('ONT-BB — FRONT DESK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ONT-BB — INSURANCE USER').last);
+    await tester.pumpAndSettle();
+
+    final claimsCard = find.byKey(
+        const ValueKey('ONT-BB|INSURANCE USER|insurance_claims_prepared'));
+    await tester.enterText(
+        find.descendant(
+            of: claimsCard,
+            matching: find.widgetWithText(TextField, 'Quantity')),
+        '6');
+    await tester.enterText(
+        find.descendant(
+            of: claimsCard,
+            matching: find.widgetWithText(TextField, 'Minutes')),
+        '45');
+
+    // Add 2 Insurance EMR rows and verify insurance_emrwise is auto-calculated
+    for (var i = 0; i < 2; i++) {
+      await tester.ensureVisible(find.text('Add EMR'));
+      await tester.tap(find.text('Add EMR'));
+      await tester.pumpAndSettle();
+      final emrField = find.widgetWithText(TextField, 'EMR No.').at(i);
+      await tester.enterText(emrField, 'INS-${200 + i}');
+      final emrCard =
+          find.ancestor(of: emrField, matching: find.byType(Card)).first;
+      await tester.enterText(
+          find.descendant(
+              of: emrCard,
+              matching: find.widgetWithText(TextField, 'Minutes')),
+          '15');
+      await tester.pumpAndSettle();
+    }
+    expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('ledger-summary-Quantity')))
+            .data,
+        '2');
+    expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('ledger-summary-Minutes')))
+            .data,
+        '30');
+
+    final insOtherField =
+        find.widgetWithText(TextField, 'Other task carried out');
+    await tester.ensureVisible(insOtherField);
+    await tester.enterText(insOtherField, 'Followed up pre-approvals');
+
+    await clickSaveAndConfirm();
+
+    final insSaved = staffApi.allEntries
+        .where((e) =>
+            e['uid'] == 'staff-all-test' &&
+            e['branch'] == 'ONT-BB' &&
+            e['category'] == 'INSURANCE USER')
+        .toList();
+    expect(
+        insSaved.firstWhere(
+            (e) => e['taskId'] == 'insurance_claims_prepared')['quantity'],
+        6);
+    final insEmrSummary =
+        insSaved.firstWhere((e) => e['taskId'] == 'insurance_emrwise');
+    expect(insEmrSummary['quantity'], 2);
+    expect(insEmrSummary['hours'], closeTo(30 / 60, 1e-6));
+    expect(
+        insSaved.where((e) => e['taskId'] == 'insurance_ledger_emr').length, 2);
+    expect(insSaved.firstWhere((e) => e['taskId'] == 'other_tasks')['remarks'],
+        'Followed up pre-approvals');
+
+    // 3. ONT-BR1 ACCOUNTS (Yes/No tasks + quantity tasks + 5 other_tasks slots)
+    await tester.ensureVisible(find.text('ONT-BB — INSURANCE USER'));
+    await tester.tap(find.text('ONT-BB — INSURANCE USER'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ONT-BR1 — ACCOUNTS').last);
+    await tester.pumpAndSettle();
+
+    // Toggle Yes on Activity 15 (accounts_month_end_closing_deposit)
+    final act15Card = find.byKey(
+        const ValueKey('ONT-BR1|ACCOUNTS|accounts_month_end_closing_deposit'));
+    await tester.ensureVisible(act15Card);
+    await tester.tap(find.byKey(
+        const ValueKey('yesno-accounts_month_end_closing_deposit-No')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Yes').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.descendant(
+            of: act15Card,
+            matching: find.widgetWithText(TextField, 'Minutes')),
+        '35');
+
+    // Enter Quantity task in ACCOUNTS: Petty cash voucher entry and filing
+    final pettyCard = find.byKey(
+        const ValueKey('ONT-BR1|ACCOUNTS|accounts_petty_cash_voucher_entry'));
+    await tester.ensureVisible(pettyCard);
+    await tester.enterText(
+        find.descendant(
+            of: pettyCard,
+            matching: find.widgetWithText(TextField, 'Quantity')),
+        '12');
+    await tester.enterText(
+        find.descendant(
+            of: pettyCard,
+            matching: find.widgetWithText(TextField, 'Minutes')),
+        '40');
+
+    // Fill 2 of the 5 Other task slots in ACCOUNTS
+    final accOther1 = find.widgetWithText(TextField, 'Other task 1');
+    await tester.ensureVisible(accOther1);
+    await tester.enterText(accOther1, 'Bank reconciliation');
+    final accOther3 = find.widgetWithText(TextField, 'Other task 3');
+    await tester.ensureVisible(accOther3);
+    await tester.enterText(accOther3, 'Supplier statement check');
+
+    await clickSaveAndConfirm();
+
+    final accSaved = staffApi.allEntries
+        .where((e) =>
+            e['uid'] == 'staff-all-test' &&
+            e['branch'] == 'ONT-BR1' &&
+            e['category'] == 'ACCOUNTS')
+        .toList();
+    final act15Saved = accSaved.firstWhere(
+        (e) => e['taskId'] == 'accounts_month_end_closing_deposit');
+    expect(act15Saved['quantity'], 1);
+    expect(act15Saved['hours'], closeTo(35 / 60, 1e-6));
+    final pettySaved = accSaved.firstWhere(
+        (e) => e['taskId'] == 'accounts_petty_cash_voucher_entry');
+    expect(pettySaved['quantity'], 12);
+    final accOthers =
+        accSaved.where((e) => e['taskId'] == 'other_tasks').toList();
+    expect(accOthers.length, 2);
+    expect(accOthers[0]['emr'], '1');
+    expect(accOthers[0]['remarks'], 'Bank reconciliation');
+    expect(accOthers[1]['emr'], '3');
+    expect(accOthers[1]['remarks'], 'Supplier statement check');
+
+    // 4. ONT-BB DOCTOR'S ZONE (all 3 doctor tasks + other_tasks)
+    await tester.ensureVisible(find.text('ONT-BR1 — ACCOUNTS'));
+    await tester.tap(find.text('ONT-BR1 — ACCOUNTS'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("ONT-BB — DOCTOR'S ZONE").last);
+    await tester.pumpAndSettle();
+
+    for (final taskId in const [
+      'doctors_consultations',
+      'doctors_follow_ups',
+      'doctors_treatments_supervised'
+    ]) {
+      final card = find.byKey(ValueKey("ONT-BB|DOCTOR'S ZONE|$taskId"));
+      await tester.ensureVisible(card);
+      await tester.enterText(
+          find.descendant(
+              of: card, matching: find.widgetWithText(TextField, 'Quantity')),
+          '4');
+      await tester.enterText(
+          find.descendant(
+              of: card, matching: find.widgetWithText(TextField, 'Minutes')),
+          '30');
+    }
+    final docOther = find.widgetWithText(TextField, 'Other task carried out');
+    await tester.ensureVisible(docOther);
+    await tester.enterText(docOther, 'Reviewed clinical case notes');
+
+    await clickSaveAndConfirm();
+
+    final docSaved = staffApi.allEntries
+        .where((e) =>
+            e['uid'] == 'staff-all-test' &&
+            e['branch'] == 'ONT-BB' &&
+            e['category'] == "DOCTOR'S ZONE")
+        .toList();
+    expect(docSaved.length, 4);
+    expect(docSaved.firstWhere((e) => e['taskId'] == 'other_tasks')['remarks'],
+        'Reviewed clinical case notes');
     expect(tester.takeException(), isNull);
   });
 }

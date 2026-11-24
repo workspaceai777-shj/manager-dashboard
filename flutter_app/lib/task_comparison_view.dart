@@ -118,6 +118,7 @@ class _ActivityGroup {
   bool get isLedger =>
       taskId == 'ledger_updated' ||
       taskId == 'ledger_prepared' ||
+      taskId == 'insurance_emrwise' ||
       taskId == 'insurance_ledger_emr';
 }
 
@@ -323,12 +324,18 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
         continue;
       }
 
-      final isLedgerRow = taskId == 'ledger_updated' ||
-          taskId == 'ledger_prepared' ||
-          taskId == 'insurance_ledger_emr';
+      final isFrontDeskLedger =
+          taskId == 'ledger_updated' || taskId == 'ledger_prepared';
+      final isInsuranceLedger =
+          taskId == 'insurance_emrwise' || taskId == 'insurance_ledger_emr';
+      final isLedgerRow = isFrontDeskLedger || isInsuranceLedger;
 
-      // Merge both ledger activities into a single 'ledger_updated' activity
-      final normalizedTaskId = isLedgerRow ? 'ledger_updated' : taskId;
+      // Merge EMR breakdown rows with their parent summary activity
+      final normalizedTaskId = isFrontDeskLedger
+          ? 'ledger_updated'
+          : isInsuranceLedger
+              ? 'insurance_emrwise'
+              : taskId;
 
       final cat = (e['category'] ?? 'FRONT DESK').toString().trim();
       final br = (e['branch'] ?? 'ONT-BB').toString().trim();
@@ -364,7 +371,7 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
       stat.entryCount += 1;
 
       if (isLedgerRow) {
-        if (taskId == 'ledger_updated') {
+        if (taskId == 'ledger_updated' || taskId == 'insurance_emrwise') {
           stat.parentLedgerQty += qtyVal;
           stat.parentLedgerHours += hrsVal;
           stat.hasParentLedger = true;
