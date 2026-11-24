@@ -159,6 +159,10 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
     'accounts_month_end_closing_deposit',
     'accounts_whitefox_consignment_sale',
     'accounts_purchase_request_month',
+    'accounts_utility_bill_ontario_al_nahda',
+    'accounts_utility_bill_ontario_bb',
+    'accounts_utility_bill_milad',
+    'accounts_utility_bill_whitefox',
     'room_chore_inspection',
     'daily_collection_billing_done',
   };

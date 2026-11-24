@@ -321,7 +321,11 @@ const accounts=[
   ['accounts_whitefox_consignment_sale','White fox Consignment basis sale checking and update'],
   ['accounts_petty_cash_voucher_entry','Petty cash voucher entry and filing'],
   ['accounts_petty_cash_excel','Petty cash excel'],
-  ['accounts_purchase_request_month','Purchase request for one month']
+  ['accounts_purchase_request_month','Purchase request for one month'],
+  ['accounts_utility_bill_ontario_al_nahda','Utility Bill Log Entry(Ontario Al Nahda)'],
+  ['accounts_utility_bill_ontario_bb','Utility Bill Log Entry(Ontario BB)'],
+  ['accounts_utility_bill_milad','Utility Bill Log Entry(Milad)'],
+  ['accounts_utility_bill_whitefox','Utility Bill Log Entry(WhiteFox)']
 ];
 const doctorsZone=[
   ['doctors_consultations','Number of Consultations'],

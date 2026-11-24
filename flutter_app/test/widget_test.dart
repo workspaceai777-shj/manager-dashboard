@@ -111,6 +111,22 @@ class FakeStaffApi extends StaffApi {
           'id': 'accounts_purchase_request_month',
           'name': 'Purchase request for one month'
         },
+        {
+          'id': 'accounts_utility_bill_ontario_al_nahda',
+          'name': 'Utility Bill Log Entry(Ontario Al Nahda)'
+        },
+        {
+          'id': 'accounts_utility_bill_ontario_bb',
+          'name': 'Utility Bill Log Entry(Ontario BB)'
+        },
+        {
+          'id': 'accounts_utility_bill_milad',
+          'name': 'Utility Bill Log Entry(Milad)'
+        },
+        {
+          'id': 'accounts_utility_bill_whitefox',
+          'name': 'Utility Bill Log Entry(WhiteFox)'
+        },
       ];
     }
     if (category.toUpperCase() == "DOCTOR'S ZONE") {
@@ -529,11 +545,16 @@ void main() {
         find.text('Travel collection closing and cash handover for deposit'),
         findsOneWidget);
     expect(find.text('Purchase request for one month'), findsOneWidget);
+    expect(
+        find.text('Utility Bill Log Entry(Ontario Al Nahda)'), findsOneWidget);
+    expect(find.text('Utility Bill Log Entry(Ontario BB)'), findsOneWidget);
+    expect(find.text('Utility Bill Log Entry(Milad)'), findsOneWidget);
+    expect(find.text('Utility Bill Log Entry(WhiteFox)'), findsOneWidget);
     expect(find.text('Other task carried out'), findsWidgets);
-    for (int i = 1; i <= 19; i++) {
+    for (int i = 1; i <= 23; i++) {
       expect(find.text('$i. '), findsOneWidget);
     }
-    expect(find.widgetWithText(InputDecorator, 'Yes / No'), findsNWidgets(16));
+    expect(find.widgetWithText(InputDecorator, 'Yes / No'), findsNWidgets(20));
     expect(find.widgetWithText(TextField, 'Quantity'), findsNWidgets(3));
 
     // Switch to ONT-BB DOCTOR'S ZONE and verify the 3 Doctor's Zone activities
@@ -1286,6 +1307,28 @@ void main() {
             matching: find.widgetWithText(TextField, 'Minutes')),
         '40');
 
+    // Toggle Yes on the 4 new Utility Bill Log Entry activities
+    for (final id in const [
+      'accounts_utility_bill_ontario_al_nahda',
+      'accounts_utility_bill_ontario_bb',
+      'accounts_utility_bill_milad',
+      'accounts_utility_bill_whitefox',
+    ]) {
+      final card = find.byKey(ValueKey('ONT-BR1|ACCOUNTS|$id'));
+      final dropdown = find.byKey(ValueKey('yesno-$id-No'));
+      await tester.ensureVisible(dropdown);
+      await tester.pumpAndSettle();
+      tester
+          .widget<DropdownButton<String>>(dropdown)
+          .onChanged
+          ?.call('Yes');
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.descendant(
+              of: card, matching: find.widgetWithText(TextField, 'Minutes')),
+          '10');
+    }
+
     // Fill 2 of the 5 Other task slots in ACCOUNTS
     final accOther1 = find.widgetWithText(TextField, 'Other task 1');
     await tester.ensureVisible(accOther1);
@@ -1309,6 +1352,16 @@ void main() {
     final pettySaved = accSaved.firstWhere(
         (e) => e['taskId'] == 'accounts_petty_cash_voucher_entry');
     expect(pettySaved['quantity'], 12);
+    for (final id in const [
+      'accounts_utility_bill_ontario_al_nahda',
+      'accounts_utility_bill_ontario_bb',
+      'accounts_utility_bill_milad',
+      'accounts_utility_bill_whitefox',
+    ]) {
+      final uSaved = accSaved.firstWhere((e) => e['taskId'] == id);
+      expect(uSaved['quantity'], 1);
+      expect(uSaved['hours'], closeTo(10 / 60, 1e-6));
+    }
     final accOthers =
         accSaved.where((e) => e['taskId'] == 'other_tasks').toList();
     expect(accOthers.length, 2);

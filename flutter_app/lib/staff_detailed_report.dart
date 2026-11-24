@@ -128,6 +128,10 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
     'accounts_month_end_closing_deposit',
     'accounts_whitefox_consignment_sale',
     'accounts_purchase_request_month',
+    'accounts_utility_bill_ontario_al_nahda',
+    'accounts_utility_bill_ontario_bb',
+    'accounts_utility_bill_milad',
+    'accounts_utility_bill_whitefox',
     'room_chore_inspection',
     'daily_collection_billing_done',
   };
@@ -229,6 +233,11 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
       'accounts_petty_cash_excel': 'Petty cash excel',
       'accounts_monthly_collection_excel': 'Monthly collection excel',
       'accounts_purchase_request_month': 'Purchase request for one month',
+      'accounts_utility_bill_ontario_al_nahda':
+          'Utility Bill Log Entry(Ontario Al Nahda)',
+      'accounts_utility_bill_ontario_bb': 'Utility Bill Log Entry(Ontario BB)',
+      'accounts_utility_bill_milad': 'Utility Bill Log Entry(Milad)',
+      'accounts_utility_bill_whitefox': 'Utility Bill Log Entry(WhiteFox)',
       // Doctor's Zone
       'doctors_consultations': 'Number of Consultations',
       'doctors_follow_ups': 'Number of Follow-ups',
@@ -426,6 +435,10 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
           'accounts_petty_cash_voucher_entry',
           'accounts_petty_cash_excel',
           'accounts_purchase_request_month',
+          'accounts_utility_bill_ontario_al_nahda',
+          'accounts_utility_bill_ontario_bb',
+          'accounts_utility_bill_milad',
+          'accounts_utility_bill_whitefox',
         ];
     }
     if (branch == 'ONT-BB') {

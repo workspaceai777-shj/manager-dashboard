@@ -186,7 +186,8 @@ class TaskLogStyle {
             'Charts prepared for next day including session & rearranged all cards.',
         'cards_arranged':
             'Charts prepared for next day including session & rearranged all cards.',
-        'ledger_updated': 'Individual Ledger Updated (R4) (including for insurance)',
+        'ledger_updated':
+            'Individual Ledger Updated (R4) (including for insurance)',
         'room_chore_inspection': 'Room Chore Inspection',
         'daily_task_updation': 'Daily Task Updation',
         'ledger_prepared': 'Individual Ledgers Prepared (EMR-wise)',
@@ -205,7 +206,8 @@ class TaskLogStyle {
       'enquiries': 'Enquiries Handled',
       'registration_excel': 'Patient Registration Excel updated',
       'ledger_prepared': 'Individual Ledgers Prepared (EMR-wise)',
-      'ledger_updated': 'Individual Ledger Updated (R4) (including for insurance)',
+      'ledger_updated':
+          'Individual Ledger Updated (R4) (including for insurance)',
       'patient_cards':
           'Arrival, Treatment Charts & Reporting Voucher preparation',
       'charts':
@@ -252,6 +254,11 @@ class TaskLogStyle {
           'Petty cash voucher entry and filing',
       'accounts_petty_cash_excel': 'Petty cash excel',
       'accounts_purchase_request_month': 'Purchase request for one month',
+      'accounts_utility_bill_ontario_al_nahda':
+          'Utility Bill Log Entry(Ontario Al Nahda)',
+      'accounts_utility_bill_ontario_bb': 'Utility Bill Log Entry(Ontario BB)',
+      'accounts_utility_bill_milad': 'Utility Bill Log Entry(Milad)',
+      'accounts_utility_bill_whitefox': 'Utility Bill Log Entry(WhiteFox)',
       // Doctor's Zone
       'doctors_consultations': 'Number of Consultations',
       'doctors_follow_ups': 'Number of Follow-ups',
