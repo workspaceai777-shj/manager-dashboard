@@ -205,7 +205,7 @@ async function dbGetActiveEntries(sheets, filters = {}) {
         callerName: e.caller_name || '',
         callStatus: e.call_status || '',
         callerPhone: e.caller_phone || '',
-        ...(TIMED_TASKS.has(e.task_id) ? { startTime: isoOrNull(e.start_time), endTime: isoOrNull(e.end_time) } : {}),
+        ...((TIMED_TASKS.has(e.task_id) || e.start_time || e.end_time) ? { startTime: isoOrNull(e.start_time), endTime: isoOrNull(e.end_time) } : {}),
         'Task Date': date,
       };
     }));
@@ -239,14 +239,14 @@ async function dbSaveEntries(sheets, markerRow, dataRows) {
         rec.caller_phone = r[7] === 'enquiry_detail' ? (r[15] || '') : '';
       }
       if (hasTimedCols) {
-        rec.start_time = (TIMED_TASKS.has(r[7]) && r[16]) ? r[16] : null;
-        rec.end_time = (TIMED_TASKS.has(r[7]) && r[17]) ? r[17] : null;
+        rec.start_time = r[16] ? r[16] : null;
+        rec.end_time = r[17] ? r[17] : null;
       }
       return rec;
     };
     const allInputRows = markerRow ? [markerRow, ...dataRows] : dataRows;
     const hasEnquiryCols = allInputRows.some(r => r[7] === 'enquiry_detail');
-    const hasTimedCols = allInputRows.some(r => TIMED_TASKS.has(r[7]) && (r[16] || r[17]));
+    const hasTimedCols = allInputRows.some(r => Boolean(r[16] || r[17]));
     for (const r of allInputRows) toInsert.push(toRecord(r));
     if (toInsert.length) {
       await insertSupabaseRows('app_entries', toInsert, false, true);
@@ -472,11 +472,8 @@ export default async function handler(req,res){
         if(!allowed.has(task)||!Number.isFinite(quantity)||!Number.isFinite(hours)||quantity<0||hours<0||hours>100000||quantity>100000)
           return result(res,400,{error:`Invalid task quantity or hours (task: ${task.slice(0,60)||'none'}${allowed.has(task)?'':', not allowed for this category'})`});
         const emr=String(e.emr??'').trim(),remarks=String(e.remarks??'').trim();
-        let times={start:null,end:null};
-        if(TIMED_TASKS.has(task)){
-          times=parseTimes(e);
-          if(!times)return result(res,400,{error:'Invalid startTime or endTime'});
-        }
+        const times=parseTimes(e);
+        if(!times)return result(res,400,{error:'Invalid startTime or endTime'});
         if(task==='enquiry_detail'){
           // One row per enquiry call: number (stored in `emr`), caller, status,
           // remarks and minutes. Reporting treats these as a breakdown only —
@@ -539,7 +536,7 @@ export default async function handler(req,res){
         callerName: r[13] || '',
         callStatus: r[14] || '',
         callerPhone: r[15] || '',
-        ...(TIMED_TASKS.has(r[7]) ? { startTime: isoOrNull(r[16]), endTime: isoOrNull(r[17]) } : {}),
+        ...((TIMED_TASKS.has(r[7]) || r[16] || r[17]) ? { startTime: isoOrNull(r[16]), endTime: isoOrNull(r[17]) } : {}),
         'Task Date': r[12] || r[4],
       }));
       return result(res,200,{saved:rows.length,entries:savedEntries});

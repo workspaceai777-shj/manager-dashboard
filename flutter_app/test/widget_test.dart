@@ -226,7 +226,10 @@ class FakeStaffApi extends StaffApi {
             'quantity': row['quantity'],
             'hours': row['hours'],
             'callerName': row['callerName'] ?? '',
+            'callerPhone': row['callerPhone'] ?? '',
             'callStatus': row['callStatus'] ?? '',
+            if (row['startTime'] != null) 'startTime': row['startTime'],
+            if (row['endTime'] != null) 'endTime': row['endTime'],
           });
         }
         return {'saved': incoming.length};

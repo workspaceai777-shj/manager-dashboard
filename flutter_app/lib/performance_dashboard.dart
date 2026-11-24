@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'staff_detailed_report.dart' show formatRowTime;
 import 'tasklog_style.dart';
 
 class PerformanceDashboard extends StatefulWidget {
@@ -114,9 +115,7 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
+  void _applyInitialDate() {
     if (!widget.isAdmin && widget.initialDate != null) {
       final now = DateTime.now();
       final d = widget.initialDate!;
@@ -127,6 +126,20 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
         _localTodayOnly = false;
         _localSingleDate = DateTime(d.year, d.month, d.day);
       }
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _applyInitialDate();
+  }
+
+  @override
+  void didUpdateWidget(covariant PerformanceDashboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.isAdmin && widget.initialDate != oldWidget.initialDate) {
+      _applyInitialDate();
     }
   }
 
@@ -313,14 +326,34 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
         byEmployee = <String, double>{},
         collectionByBranch = <String, double>{};
     final otherRemarks = <String>{};
+    final taskTimes = <String, List<String>>{};
     for (final e in rows) {
       final task = e['taskId'].toString();
       final name = e['employeeName'].toString();
       final br = (e['branch'] ?? '').toString().trim();
+      final hasTime = (e['startTime'] ?? '').toString().trim().isNotEmpty ||
+          (e['endTime'] ?? '').toString().trim().isNotEmpty;
       // EMR-wise rows are a breakdown of an activity already recorded, so their
       // time is never added to totals; insurance EMR-wise quantity is excluded too.
       final isEmrRow =
           task == 'ledger_prepared' || task == 'insurance_ledger_emr';
+      if (hasTime) {
+        final timeRange =
+            'Start: ${formatRowTime(e['startTime'])} · End: ${formatRowTime(e['endTime'])}';
+        if (isEmrRow) {
+          final emrNo = (e['emr'] ?? '').toString().trim();
+          final line = emrNo.isNotEmpty ? 'EMR $emrNo — $timeRange' : timeRange;
+          taskTimes
+              .putIfAbsent(
+                  task == 'insurance_ledger_emr'
+                      ? 'insurance_emrwise'
+                      : 'ledger_updated',
+                  () => <String>[])
+              .add(line);
+        } else {
+          taskTimes.putIfAbsent(task, () => <String>[]).add(timeRange);
+        }
+      }
       if (task == 'ledger_prepared') {
         final q = num(e['quantity']);
         totals[task] = (totals[task] ?? 0) + (q > 0 ? q : 1);
@@ -341,6 +374,78 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
         final r = (e['remarks'] ?? '').toString().trim();
         if (r.isNotEmpty) otherRemarks.add(r);
       }
+    }
+    // Also attach start/end times (and caller/phone) from enquiry_detail rows matching current filters
+    for (final e in widget.records) {
+      if (e is! Map || e['taskId'] != 'enquiry_detail') continue;
+      final hasTime = (e['startTime'] ?? '').toString().trim().isNotEmpty ||
+          (e['endTime'] ?? '').toString().trim().isNotEmpty;
+      if (!hasTime) continue;
+      final empName = (e['employeeName'] ?? '').toString().trim();
+      if (empName.toLowerCase() == 'administrator') continue;
+      if (!widget.isAdmin) {
+        final rowUid = (e['uid'] ?? '').toString().trim();
+        if (widget.currentStaffUid.isNotEmpty &&
+            rowUid.isNotEmpty &&
+            rowUid != widget.currentStaffUid) {
+          continue;
+        }
+        if (widget.currentStaffName.isNotEmpty &&
+            empName.isNotEmpty &&
+            empName.toLowerCase() !=
+                widget.currentStaffName.trim().toLowerCase()) {
+          continue;
+        }
+      }
+      if (branch != 'ALL' && e['branch'] != branch) continue;
+      if (category != 'ALL' && e['category'] != category) continue;
+      if (employee != 'ALL' && empName != employee) continue;
+      final d = TaskLogStyle.parseEntryDate(e['Task Date'] ?? e['date']);
+      if (!widget.isAdmin) {
+        final targetDay =
+            (!todayOnly && singleDate != null) ? singleDate! : DateTime.now();
+        if (d == null ||
+            d.year != targetDay.year ||
+            d.month != targetDay.month ||
+            d.day != targetDay.day) {
+          continue;
+        }
+      } else if (singleDate != null) {
+        if (d == null ||
+            d.year != singleDate!.year ||
+            d.month != singleDate!.month ||
+            d.day != singleDate!.day) {
+          continue;
+        }
+      } else if (todayOnly) {
+        final today = DateTime.now();
+        if (d == null ||
+            d.year != today.year ||
+            d.month != today.month ||
+            d.day != today.day) {
+          continue;
+        }
+      } else if (period != null) {
+        if (d == null) continue;
+        final start = DateTime(
+            period!.start.year, period!.start.month, period!.start.day);
+        final end = DateTime(
+            period!.end.year, period!.end.month, period!.end.day, 23, 59, 59);
+        if (d.isBefore(start) || d.isAfter(end)) continue;
+      }
+      final callNo = (e['emr'] ?? '').toString().trim();
+      final caller = (e['callerName'] ?? '').toString().trim();
+      final phone = (e['callerPhone'] ?? '').toString().trim();
+      final prefix = [
+        if (callNo.isNotEmpty) '#$callNo',
+        if (caller.isNotEmpty) caller,
+        if (phone.isNotEmpty) phone,
+      ].join(' ');
+      final timeRange =
+          'Start: ${formatRowTime(e['startTime'])} · End: ${formatRowTime(e['endTime'])}';
+      taskTimes
+          .putIfAbsent('enquiries', () => <String>[])
+          .add(prefix.isNotEmpty ? '$prefix — $timeRange' : timeRange);
     }
     String formatTaskLabel(String key) {
       final base = TaskLogStyle.activityTitle(branch, category, key);
@@ -539,29 +644,46 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                     final qtyText = e.value % 1 == 0
                         ? e.value.toInt().toString()
                         : e.value.toStringAsFixed(1);
+                    final times = taskTimes[e.key] ?? const <String>[];
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Text(
-                              formatTaskLabel(e.key),
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                color: TaskLogStyle.ink,
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  formatTaskLabel(e.key),
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    color: TaskLogStyle.ink,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                qtyText,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: TaskLogStyle.teal,
+                                ),
+                              ),
+                            ],
+                          ),
+                          for (final t in times)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                t,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: TaskLogStyle.muted,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            qtyText,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: TaskLogStyle.teal,
-                            ),
-                          ),
                         ],
                       ),
                     );
@@ -622,40 +744,58 @@ class _PerformanceDashboardState extends State<PerformanceDashboard> {
                   ...hourTasks.asMap().entries.map((entry) {
                     final e = entry.value;
                     final color = chartColors[entry.key % chartColors.length];
+                    final times = taskTimes[e.key] ?? const <String>[];
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4, right: 8),
-                            child: Container(
-                              width: 9,
-                              height: 9,
-                              decoration: BoxDecoration(
-                                color: color,
-                                shape: BoxShape.circle,
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding:
+                                    const EdgeInsets.only(top: 4, right: 8),
+                                child: Container(
+                                  width: 9,
+                                  height: 9,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  formatTaskLabel(e.key),
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    color: TaskLogStyle.ink,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                formatDuration(e.value),
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: TaskLogStyle.teal,
+                                ),
+                              ),
+                            ],
+                          ),
+                          for (final t in times)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 17, top: 2),
+                              child: Text(
+                                t,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: TaskLogStyle.muted,
+                                ),
                               ),
                             ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              formatTaskLabel(e.key),
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                color: TaskLogStyle.ink,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            formatDuration(e.value),
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: TaskLogStyle.teal,
-                            ),
-                          ),
                         ],
                       ),
                     );

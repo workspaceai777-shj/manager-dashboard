@@ -220,6 +220,7 @@ class _PortalState extends State<Portal> {
   // Actual first-start / last-end per row, parallel to enqMins / mins.
   final enqStart = <DateTime?>[], enqEnd = <DateTime?>[];
   final emrStart = <DateTime?>[], emrEnd = <DateTime?>[];
+  final taskStart = <String, DateTime?>{}, taskEnd = <String, DateTime?>{};
 
   /// Five slots are allocated; only [otherTaskSlots] are shown/saved
   /// (5 for ACCOUNTS, 1 for every other category).
@@ -351,16 +352,23 @@ class _PortalState extends State<Portal> {
   }
 
   void _recordTime(String key, {required bool start}) {
+    final now = DateTime.now();
     final isEnq = key.startsWith('enq-');
     final isEmr = key.startsWith('emr-');
-    if (!isEnq && !isEmr) return;
+    if (!isEnq && !isEmr) {
+      if (start) {
+        taskStart[key] ??= now;
+      } else {
+        taskEnd[key] = now;
+      }
+      return;
+    }
     final i = int.tryParse(key.substring(4));
     if (i == null) return;
     final s = isEnq ? enqStart : emrStart;
     final e = isEnq ? enqEnd : emrEnd;
     _syncTimes(s, i + 1);
     _syncTimes(e, i + 1);
-    final now = DateTime.now();
     if (start) {
       s[i] ??= now;
     } else {
@@ -417,7 +425,7 @@ class _PortalState extends State<Portal> {
       final i = int.tryParse(key.substring(4));
       return (i != null && i < emrStart.length) ? emrStart[i] : null;
     }
-    return null;
+    return taskStart[key];
   }
 
   DateTime? _savedEndForKey(String key) {
@@ -429,7 +437,7 @@ class _PortalState extends State<Portal> {
       final i = int.tryParse(key.substring(4));
       return (i != null && i < emrEnd.length) ? emrEnd[i] : null;
     }
-    return null;
+    return taskEnd[key];
   }
 
   Widget _timerControls(String key, TextEditingController ctrl,
@@ -811,6 +819,8 @@ class _PortalState extends State<Portal> {
     emr.clear();
     emrStart.clear();
     emrEnd.clear();
+    taskStart.clear();
+    taskEnd.clear();
     remark.clear();
     mins.clear();
     _running.clear();
@@ -847,6 +857,10 @@ class _PortalState extends State<Portal> {
         final time = double.tryParse(row['hours'].toString()) ?? 0;
         hours.putIfAbsent(id, () => TextEditingController()).text =
             (time * 60).round().toString();
+        final st = _parseTs(row['startTime']);
+        final en = _parseTs(row['endTime']);
+        if (st != null) taskStart[id] = st;
+        if (en != null) taskEnd[id] = en;
       }
     }
     _restoreOtherTasks(otherRows, otherTaskSlots);
@@ -972,10 +986,14 @@ class _PortalState extends State<Portal> {
       final q = parsedQ < 0 ? 0.0 : parsedQ;
       final m = parsedM < 0 ? 0.0 : parsedM;
       if (q > 0 || m > 0) {
+        final st = taskStart[id];
+        final en = taskEnd[id];
         data.add({
           'taskId': id,
           'quantity': id == 'collection' ? q : q.round(),
           'hours': m / 60.0,
+          if (st != null) 'startTime': st.toUtc().toIso8601String(),
+          if (en != null) 'endTime': en.toUtc().toIso8601String(),
         });
       }
     }
@@ -1089,7 +1107,29 @@ class _PortalState extends State<Portal> {
           : null;
       await restoreReport(branch, category, reportDate,
           preloadedEntries: returnedEntries);
-      unawaited(refreshDashboardData());
+      if (returnedEntries != null) {
+        final targetDate = _date(reportDate);
+        final currentUid = (profile['uid'] ?? '').toString().trim();
+        setState(() {
+          entries = [
+            ...entries.where((e) {
+              if (e is! Map) return true;
+              final eUid = (e['uid'] ?? '').toString().trim();
+              final eDate = (e['Task Date'] ?? e['date'] ?? '').toString().trim();
+              final eBranch = (e['branch'] ?? '').toString().trim();
+              final eCat = (e['category'] ?? '').toString().trim();
+              return !(eUid == currentUid &&
+                  eDate == targetDate &&
+                  eBranch == branch &&
+                  eCat == category);
+            }),
+            ...returnedEntries,
+          ];
+        });
+        unawaited(refreshDashboardData());
+      } else {
+        await refreshDashboardData();
+      }
       message('Daily report saved for ${_date(reportDate)}');
     } catch (e) {
       message(e.toString());

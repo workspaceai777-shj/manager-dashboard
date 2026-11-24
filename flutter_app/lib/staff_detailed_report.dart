@@ -1783,6 +1783,26 @@ class _StaffDetailedReportState extends State<StaffDetailedReport> {
                                         child: rowTimeTable(r,
                                             idLabel: 'EMR No.', id: emr),
                                       ),
+                                    ] else if ((r['startTime'] ?? '')
+                                            .toString()
+                                            .trim()
+                                            .isNotEmpty ||
+                                        (r['endTime'] ?? '')
+                                            .toString()
+                                            .trim()
+                                            .isNotEmpty) ...[
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                            left: 20, top: 4),
+                                        child: Text(
+                                          'Start time: ${formatRowTime(r['startTime'])}   |   End time: ${formatRowTime(r['endTime'])}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: TaskLogStyle.teal,
+                                          ),
+                                        ),
+                                      ),
                                     ],
                                     if (r['_enquiryDetails'] is List &&
                                         (r['_enquiryDetails'] as List)
