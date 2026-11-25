@@ -81,23 +81,61 @@ Future<Uint8List> buildReportPdf({
       ]);
 
   pw.Widget table(List<String> head, List<List<String>> data,
-      {Map<int, pw.Alignment>? align, Map<int, pw.TableColumnWidth>? widths}) {
-    return pw.TableHelper.fromTextArray(
-      headers: head,
-      data: [
-        for (final r in data) [for (final c in r) pdfSafe(_capCell(c))]
-      ],
-      headerStyle: pw.TextStyle(
-          fontSize: 8.5,
-          fontWeight: pw.FontWeight.bold,
-          color: PdfColors.white),
-      headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
-      cellStyle: pw.TextStyle(fontSize: 8.5),
-      cellAlignments: align,
+      {Map<int, pw.Alignment>? align,
+      Map<int, pw.TableColumnWidth>? widths,
+      Set<int>? highlightNegativeCols}) {
+    final tableRows = <pw.TableRow>[
+      pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+        children: [
+          for (var c = 0; c < head.length; c++)
+            pw.Container(
+              alignment: align?[c] ?? pw.Alignment.centerLeft,
+              padding:
+                  const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: pw.Text(
+                pdfSafe(head[c]),
+                style: pw.TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.white,
+                ),
+              ),
+            ),
+        ],
+      ),
+      for (final r in data)
+        pw.TableRow(
+          children: [
+            for (var c = 0; c < r.length; c++)
+              () {
+                final text = pdfSafe(_capCell(r[c]));
+                final isNegative =
+                    (highlightNegativeCols?.contains(c) ?? false) &&
+                        text.trim().startsWith('-');
+                return pw.Container(
+                  alignment: align?[c] ?? pw.Alignment.centerLeft,
+                  padding:
+                      const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  child: pw.Text(
+                    text,
+                    style: pw.TextStyle(
+                      fontSize: 8.5,
+                      color: isNegative ? PdfColors.red700 : PdfColors.black,
+                      fontWeight: isNegative
+                          ? pw.FontWeight.bold
+                          : pw.FontWeight.normal,
+                    ),
+                  ),
+                );
+              }(),
+          ],
+        ),
+    ];
+    return pw.Table(
       columnWidths: widths,
-      headerAlignments: align,
       border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.4),
-      cellPadding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      children: tableRows,
     );
   }
 
@@ -294,10 +332,10 @@ Future<Uint8List> buildReportPdf({
         ],
     ], align: {
       for (var i = 1; i < 9; i++) i: pw.Alignment.centerRight
-    }));
+    }, highlightNegativeCols: const {6, 7}));
     body.add(pw.SizedBox(height: 4));
     body.add(pw.Text(
-        'Standard working hours = 10.00 hrs (600 min) per day. Variance = Standard working hours - Actual hours worked. Daily total = sum of activity minutes (enquiry call and EMR-wise ledger minutes are breakdowns and are not added).',
+        'Standard working hours = 10.00 hrs (600 min) per day. Variance = Actual hours worked - Standard working hours (negative in red when worked less than standard hours). Daily total = sum of activity minutes (enquiry call and EMR-wise ledger minutes are breakdowns and are not added).',
         style: pw.TextStyle(fontSize: 8, fontStyle: pw.FontStyle.italic)));
     for (final s in list) {
       body.add(pw.SizedBox(height: 10));
@@ -332,7 +370,7 @@ Future<Uint8List> buildReportPdf({
         ],
       ], align: {
         for (var i = 1; i < 7; i++) i: pw.Alignment.centerRight
-      }));
+      }, highlightNegativeCols: const {5, 6}));
     }
   } else {
     final list = buildActivitySummary(rows);

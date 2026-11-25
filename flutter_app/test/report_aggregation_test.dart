@@ -39,10 +39,10 @@ void main() {
     expect(a.daysWorked, 2);
     expect(a.days.first.minutes, 90);
     expect(a.days.first.standardMinutes, 600);
-    expect(a.days.first.varianceMinutes, 600 - 90);
+    expect(a.days.first.varianceMinutes, 90 - 600);
     expect(a.totalMinutes, 90 + 120);
     expect(a.standardMinutes, 2 * 600);
-    expect(a.varianceMinutes, 1200 - 210);
+    expect(a.varianceMinutes, 210 - 1200);
     expect(a.avgMinutesPerDay, 105);
   });
 

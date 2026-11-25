@@ -187,7 +187,7 @@ class DayTotal {
   final DateTime date;
   final int minutes;
   int get standardMinutes => standardDailyMinutes;
-  int get varianceMinutes => standardMinutes - minutes;
+  int get varianceMinutes => minutes - standardMinutes;
 }
 
 class StaffSummary {
@@ -199,7 +199,7 @@ class StaffSummary {
   int get daysWorked => days.length;
   int get standardMinutes => daysWorked * standardDailyMinutes;
   int get totalMinutes => days.fold(0, (a, d) => a + d.minutes);
-  int get varianceMinutes => standardMinutes - totalMinutes;
+  int get varianceMinutes => totalMinutes - standardMinutes;
   double get avgMinutesPerDay =>
       daysWorked == 0 ? 0 : totalMinutes / daysWorked;
 }
