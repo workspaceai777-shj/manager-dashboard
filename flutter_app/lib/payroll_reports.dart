@@ -62,7 +62,7 @@ Future<Uint8List> buildReportPdf({
 }) async {
   final at = now ?? DateTime.now();
   final doc = pw.Document(title: type.title, author: generatedBy);
-  final period = criteria.periodLabel(at);
+  final period = criteria.periodLabel(at, entries: rows);
   final format = PdfPageFormat.a4.landscape;
   final base = pw.TextStyle(fontSize: 9);
   final bold = pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold);
@@ -564,7 +564,9 @@ class _PayrollReportsDialogState extends State<PayrollReportsDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Period: ${c.periodLabel(DateTime.now())}'),
+            Text(
+              'Period: ${c.periodLabel(DateTime.now(), entries: widget.preloadedEntries)}',
+            ),
             for (final l in c.describe()) Text(l),
             const SizedBox(height: 8),
             for (final t in PdfReportType.values)

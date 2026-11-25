@@ -54,10 +54,40 @@ class ReportCriteria {
     );
   }
 
-  String periodLabel(DateTime now) {
-    final r = range(now);
-    final a = TaskLogStyle.dateLabel(r.from), b = TaskLogStyle.dateLabel(r.to);
-    return a == b ? a : '$a to $b';
+  bool get isAllLoadedDates =>
+      singleDate == null && period == null && !todayOnly;
+
+  String periodLabel(DateTime now, {Iterable<dynamic>? entries}) {
+    if (!isAllLoadedDates) {
+      final r = range(now);
+      final a = TaskLogStyle.dateLabel(r.from),
+          b = TaskLogStyle.dateLabel(r.to);
+      return a == b ? a : '$a to $b';
+    }
+    if (entries != null) {
+      DateTime? minD;
+      DateTime? maxD;
+      for (final raw in entries) {
+        if (raw is! Map) continue;
+        final name = _s(raw['employeeName']);
+        if (name.toLowerCase() == 'administrator') continue;
+        if (_s(raw['taskId']) == 'emr_updated') continue;
+        if (branch != 'ALL' && _s(raw['branch']) != branch) continue;
+        if (category != 'ALL' && _s(raw['category']) != category) continue;
+        if (employee != 'ALL' && name != employee) continue;
+        final d = TaskLogStyle.parseEntryDate(raw['Task Date'] ?? raw['date']);
+        if (d == null) continue;
+        final day = DateTime(d.year, d.month, d.day);
+        if (minD == null || day.isBefore(minD)) minD = day;
+        if (maxD == null || day.isAfter(maxD)) maxD = day;
+      }
+      if (minD != null && maxD != null) {
+        final a = TaskLogStyle.dateLabel(minD),
+            b = TaskLogStyle.dateLabel(maxD);
+        return a == b ? a : '$a to $b';
+      }
+    }
+    return 'All loaded dates';
   }
 
   List<String> describe() => [

@@ -311,6 +311,21 @@ class _TaskComparisonViewState extends State<TaskComparisonView> {
     if (period != null) {
       return '${dateLabel(period!.start)} — ${dateLabel(period!.end)}';
     }
+    DateTime? minD;
+    DateTime? maxD;
+    for (final raw in filteredRows) {
+      if (raw is! Map) continue;
+      final d = TaskLogStyle.parseEntryDate(raw['Task Date'] ?? raw['date']);
+      if (d == null) continue;
+      final day = DateTime(d.year, d.month, d.day);
+      if (minD == null || day.isBefore(minD)) minD = day;
+      if (maxD == null || day.isAfter(maxD)) maxD = day;
+    }
+    if (minD != null && maxD != null) {
+      final a = dateLabel(minD);
+      final b = dateLabel(maxD);
+      return a == b ? a : '$a — $b';
+    }
     return 'All loaded dates';
   }
 

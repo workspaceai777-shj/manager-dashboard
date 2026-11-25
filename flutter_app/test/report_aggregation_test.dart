@@ -96,6 +96,13 @@ void main() {
     final now = DateTime(2026, 3, 10);
     expect(
         const ReportCriteria(todayOnly: true).periodLabel(now), '10/03/2026');
+    expect(
+        const ReportCriteria().periodLabel(now, entries: rows),
+        '05/01/2026 to 06/01/2026');
+    expect(
+        const ReportCriteria(employee: 'Ben').periodLabel(now, entries: rows),
+        '05/01/2026');
+    expect(const ReportCriteria().periodLabel(now), 'All loaded dates');
     final r = const ReportCriteria().range(now);
     expect(r.to.difference(r.from).inDays + 1, maxRangeDays);
     expect(
